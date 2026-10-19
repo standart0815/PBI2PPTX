@@ -8,6 +8,7 @@
     fake-changed      "1": the User has personal changes, so "Reset to default" is enabled
     fake-actual-size  "1": the canvas is not in fit-to-page view
     fake-no-pane      "1": the report hides its filter pane (no toggle button)
+    fake-date-time    "1": date cards show a midnight time, as a column that stores times may ("ist vor 01.01.2014 00:00:00")
     fake-pane-filters JSON [{table, column, condition, ticked?}]: filters the User set in the Filter Pane
     fake-slicers      JSON [{column, kind: list|dropdown|range|other, items?: [[value, checked]], selectAll?, text?, scrollable?,
                             available?: [first, last], selected?: [first, last]}]
@@ -84,7 +85,8 @@ function restatement(f) {
   const words = EN
     ? { ge: "is on or after", gt: "is after", le: "is on or before", lt: "is before" }
     : { ge: "ist am oder nach", gt: "ist nach", le: "ist am oder vor", lt: "ist vor" };
-  return `${words[f.operator]} ${shown}`;
+  const time = store.get("fake-date-time") ? (EN ? " 12:00:00 AM" : " 00:00:00") : "";
+  return `${words[f.operator]} ${shown}${time}`;
 }
 
 // Power BI applies only filters on fields that exist, and says nothing about the others.

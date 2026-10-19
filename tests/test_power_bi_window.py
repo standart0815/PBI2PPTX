@@ -331,3 +331,16 @@ def test_a_date_range_from_the_page_address_is_taken_over(tmp_path):
 
     result = run(check())
     assert result.filters == [second_half] and result.left_out == []
+
+
+@pytest.mark.parametrize("language", ["de-DE", "en-US"])
+def test_a_midnight_time_on_date_cards_still_verifies(tmp_path, language):
+    second_half = DateFilter("Calendar", "Date", date(2013, 6, 1), date(2013, 12, 31))
+
+    async def check():
+        async with fake_window(tmp_path, language) as w:
+            await w.open_home()
+            await w.page.evaluate("() => localStorage.setItem('fake-date-time', '1')")
+            return await w.check_filters(parse_page_url(WS_PAGE), [second_half])
+
+    assert run(check()).check is FilterCheck.APPLIED

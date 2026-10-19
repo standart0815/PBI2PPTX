@@ -51,29 +51,31 @@ FILTER_PANE_TOGGLE_TEXTS = ("Filterbereich anzeigen/ausblenden", "Show/hide filt
 # Card titles read "<Column> ist <Value> oder <Value>" ("<Column> is <Value> or <Value>").
 FILTER_CARD_TITLES = "filter-pane-modern div.filterCardTitleSection"
 FILTER_CARD_VALUE_SEPARATORS = r" oder | or |, "
-# Inside a card: the full field name as `"table"[column]` (title attribute), and the condition (title attribute).
+# Inside a card: the full field name (title attribute), and the condition (title attribute).
 FILTER_CARD_FIELD = "[data-testid=filter-card-title]"
 FILTER_CARD_RESTATEMENT = "[data-testid=filter-card-restatement]"
+# The field name reads `"financials"[Country]` in German and `'financials'[Country]` in English. Checked 2026-10-19.
+FILTER_CARD_FIELD_NAME = r"""^["']?(?P<table>.+?)["']?\[(?P<column>.+)\]$"""
 
 # Date cards: a date range shows one card per end, e.g. "ist am oder nach 01.06.2013" and
 # "ist vor 01.01.2014" ("is on or after 6/1/2013", "is before 1/1/2014"). Checked 2026-10-19.
-# Each pair is (German, English), matching date_shown().
+# Each pair is (German, English); the dates are read with parse_shown_date().
 DATE_ON_OR_AFTER = ("ist am oder nach ", "is on or after ")
 DATE_AFTER = ("ist nach ", "is after ")
 DATE_ON_OR_BEFORE = ("ist am oder vor ", "is on or before ")
 DATE_BEFORE = ("ist vor ", "is before ")
 
 
-def date_shown(day: date) -> tuple:
-    """How the Filter Pane writes a date: (German, English), e.g. ("01.06.2013", "6/1/2013")."""
-    return (f"{day:%d.%m.%Y}", f"{day.month}/{day.day}/{day.year}")
+# A column that stores a time may show midnight after the date. Not yet seen live, so matched loosely.
+MIDNIGHT = r"(?:\s+(?:00:00(?::00)?|12:00(?::00)?\s*AM))?"
 
 
 def parse_shown_date(text: str) -> date | None:
-    """A date as the Filter Pane or a slicer writes it ("01.06.2013", "6/1/2013"), or None."""
-    if match := re.fullmatch(r"(\d{1,2})\.(\d{1,2})\.(\d{4})", text.strip()):
+    """A date as the Filter Pane or a slicer writes it ("01.06.2013", "6/1/2013", also with a midnight
+    time such as "6/1/2013 12:00:00 AM"), or None."""
+    if match := re.fullmatch(r"(\d{1,2})\.(\d{1,2})\.(\d{4})" + MIDNIGHT, text.strip()):
         day, month, year = match.groups()
-    elif match := re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})", text.strip()):
+    elif match := re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{4})" + MIDNIGHT, text.strip()):
         month, day, year = match.groups()
     else:
         return None

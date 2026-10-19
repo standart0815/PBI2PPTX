@@ -16,7 +16,6 @@ from datetime import date, timedelta
 from . import power_bi_ui as ui
 from .page_url import DateFilter, Filter
 
-_FIELD = re.compile(r"""^["']?(?P<table>.+?)["']?\[(?P<column>.+)\]$""")
 _NUMBER_OR_DATE = re.compile(r"[\d\s.,:/+\-]+")
 
 
@@ -56,7 +55,7 @@ class TakeOver:
 
 def split_field(text: str) -> tuple | None:
     """'"financials"[Country]' → ("financials", "Country")."""
-    match = _FIELD.match(text.strip())
+    match = re.match(ui.FILTER_CARD_FIELD_NAME, text.strip())
     return (match["table"], match["column"]) if match else None
 
 
@@ -65,7 +64,10 @@ def looks_like_number_or_date(value: str) -> bool:
 
 
 def date_condition(condition: str) -> tuple | None:
-    """A date card's condition as ("start" | "end", inclusive date): "ist vor 01.01.2014" → ("end", 31.12.2013)."""
+    """A date card's condition as ("start" | "end", inclusive date): "ist vor 01.01.2014" → ("end", 31.12.2013).
+
+    The date is None when the card reads like a date condition but its date can't be read.
+    None for any other condition, such as the value in "ist vor Ort"."""
     for prefixes, end, shift in (
         (ui.DATE_ON_OR_AFTER, "start", 0),
         (ui.DATE_AFTER, "start", 1),
@@ -73,9 +75,9 @@ def date_condition(condition: str) -> tuple | None:
         (ui.DATE_BEFORE, "end", -1),
     ):
         prefix = next((p for p in prefixes if condition.startswith(p)), None)
-        if prefix is not None:
+        if prefix is not None and condition[len(prefix) : len(prefix) + 1].isdigit():
             day = ui.parse_shown_date(condition[len(prefix) :])
-            return (end, day + timedelta(days=shift)) if day else None
+            return (end, day + timedelta(days=shift) if day else None)
     return None
 
 
@@ -132,6 +134,9 @@ def take_over(cards: list, slicers: list) -> TakeOver:
             continue
         if dated := date_condition(condition):
             end, day = dated
+            if day is None:
+                result.left_out.append(LeftOut(what, "the date couldn't be read"))
+                continue
             narrow(table, column, day if end == "start" else None, day if end == "end" else None)
             continue
         if condition.startswith(ui.CONDITION_RELATIVE):

@@ -159,3 +159,23 @@ def test_date_settings_that_cant_be_taken_over():
         "Slicer Units": "only date ranges are supported",
         "Slicer Order date": "this kind of slicer isn't supported (such as relative dates)",
     }
+
+
+def test_a_date_card_whose_date_cant_be_read_is_left_out():
+    # A time other than midnight, or a format not seen yet: never a nonsense value Filter.
+    cards = [
+        FilterCard("'Calendar'[Date]", "is on or after 6/1/2013 1:30:00 PM"),
+        FilterCard('"Calendar"[Date]', "ist vor 2013-06-01"),
+        FilterCard('"Places"[Spot]', "ist vor Ort"),  # a value that only looks like "ist vor …"
+    ]
+    result = take_over(cards, [])
+    assert result.filters == [Filter("Places", "Spot", ("vor Ort",))]
+    assert {lo.what: lo.reason for lo in result.left_out} == {
+        "Date is on or after 6/1/2013 1:30:00 PM": "the date couldn't be read",
+        "Date ist vor 2013-06-01": "the date couldn't be read",
+    }
+
+
+def test_a_midnight_time_on_a_date_card_is_the_same_day():
+    cards = [FilterCard("'Calendar'[Date]", "is on or after 6/1/2013 12:00:00 AM"), FilterCard('"Calendar"[Date]', "ist vor 01.01.2014 00:00:00")]
+    assert take_over(cards, []).filters == [SECOND_HALF_2013]

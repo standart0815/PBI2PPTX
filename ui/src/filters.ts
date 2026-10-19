@@ -14,7 +14,7 @@ export const DATE_RULES: { rule: DateRule; label: string }[] = [
   { rule: "endOfLastYear", label: "End of last year" },
 ];
 
-/** What an end becomes in an edit: a DateEnd, or "keep" each Filter's own end (multi-edit only). */
+/** What an end becomes in an edit: a DateEnd, or "keep" each Filter's own end ("Edit selected" in the Filter Overview only). */
 export type EndEdit = DateEnd | "keep";
 
 /** The new condition an edit sets: values, or a date range. */

@@ -17,7 +17,7 @@ Terms are defined in [GLOSSARY.md](../GLOSSARY.md). The decisions behind the des
      - **What's taken over:** what the Filter Pane and the page's slicers show, as far as it can be written as "column = values". That includes author defaults, which is harmless because the page looks the same.
      - **What's skipped:** filters and slicers showing "Alle"/"All".
      - **What's left out:** Top N, relative date slicers (Q81) and click highlights. The interface's notice lists them with the reason. Nothing about them appears on the slide.
-     - **Date slicers** (Q80): the chosen from–to becomes a Date Filter with fixed dates. If the slicer covers its whole available range, nothing is taken over, as with "Alle".
+     - **Date slicers** (Q80): the chosen from–to becomes a Date Filter with fixed dates. Only an end the User moved is taken over: an end left at the slicer's limit stays open, so that new data keeps showing in later Exports (decided 2026-10-20). If the slicer covers its whole available range, nothing is taken over, as with "Alle".
      - **Date cards in the Filter Pane** (Q90): a date range set in the pane, or by a page address, shows as separate cards for each end. They become one Date Filter with fixed dates:
        - "ist am oder nach X" / "is on or after X" gives from = X
        - "ist nach X" / "is after X" gives from = the day after X

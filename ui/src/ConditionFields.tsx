@@ -3,8 +3,8 @@ import type { Condition, EndEdit } from "./filters";
 import type { DateEnd, DateRule } from "./types";
 
 // The condition part of a Filter, shared by the Filter form and "Edit selected" in the Filter
-// Overview: values, or a date range whose ends are none, a fixed date or a Date Rule. Only a
-// multi-edit offers "keep as is" for an end (DESIGN.md, Filter Overview).
+// Overview: values, or a date range whose ends are none, a fixed date or a Date Rule. Only "Edit
+// selected" offers "keep as is" for an end (DESIGN.md, Filter Overview).
 
 export type EndChoice = "keep" | "none" | "date" | DateRule;
 

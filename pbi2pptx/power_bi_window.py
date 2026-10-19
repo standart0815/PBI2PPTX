@@ -13,7 +13,6 @@ import re
 import shutil
 import time
 from dataclasses import dataclass, field
-from datetime import timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Sequence
@@ -22,7 +21,7 @@ from playwright.async_api import BrowserContext, Page, async_playwright
 
 from . import power_bi_ui as ui
 from .page_url import DateFilter, Filter, PageUrl, is_app_link, parse_page_url
-from .set_filters import FilterCard, Slicer, TakeOver, split_field, take_over
+from .set_filters import FilterCard, Slicer, TakeOver, date_condition, split_field, take_over
 
 
 def profile_dir() -> Path:
@@ -123,14 +122,13 @@ def card_shows(title: str, f: Filter) -> bool:
 def date_cards_show(cards: Sequence[ShownCard], f: DateFilter) -> bool:
     """Whether every end of a Date Filter (fixed dates) shows as its own card on the same field.
 
-    "From X" is sent as "on or after X", and "to Y" as "before the day after Y"."""
-    expected = []
-    if f.start is not None:
-        expected.append({p + d for p, d in zip(ui.DATE_ON_OR_AFTER, ui.date_shown(f.start))})
+    "From X" is sent as "on or after X", and "to Y" as "before the day after Y"; the cards are read
+    back the same way as when taking over, so "ist vor 20.10.2026" is to = 19.10.2026."""
+    shown = {date_condition(c.condition) for c in cards if split_field(c.field) == (f.table, f.column)}
+    wanted = {("start", f.start)} if f.start is not None else set()
     if f.end is not None:
-        expected.append({p + d for p, d in zip(ui.DATE_BEFORE, ui.date_shown(f.end + timedelta(days=1)))})
-    on_field = [c.condition for c in cards if split_field(c.field) == (f.table, f.column)]
-    return all(any(c in texts for c in on_field) for texts in expected)
+        wanted.add(("end", f.end))
+    return wanted <= shown
 
 
 def filter_shown(cards: Sequence[ShownCard], f: Filter | DateFilter) -> bool:
