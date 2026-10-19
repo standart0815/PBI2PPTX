@@ -69,6 +69,7 @@ Each step ends with something runnable and tested.
 3. **Local server and interface shell.**
    - Server with token check, the React app, and a status bar showing whether the User is signed in, plus "Sign out".
    - Done when: launching opens the interface and the Power BI Window, and the sign-in state shows correctly.
+   - Status (2026-10-19): **done locally.** `uv run pbi2pptx` starts the server, the interface and the Power BI Window. The interface has sign-in status, Show, Sign out and Quit. Start manual: [GETTING-STARTED.md](GETTING-STARTED.md). The update check (decision Q54) waits for the GitHub repository URL.
 4. **Building a Selection.**
    - "Add current page", pasting a Page URL or an App link, the Entry list with drag-and-drop, slide titles, delete.
    - The Filter form (table, column, values) with "apply to all Entries".
