@@ -1,6 +1,6 @@
 # Starting and using PBI2PPTX
 
-This manual covers version 0.1.0, a pilot version. It covers the whole path: install, sign in to Power BI, build a Selection of pages, choose the Template, Slide Layout and Render Language, and export the Deck.
+This manual covers version 0.1.0. It covers the whole path: install, sign in to Power BI, build a Selection of pages, choose the Template, Slide Layout and Render Language, and export the Deck.
 
 Terms such as *Power BI Window*, *Selection* and *Deck* are explained in [GLOSSARY.md](../GLOSSARY.md).
 
@@ -11,7 +11,7 @@ Terms such as *Power BI Window*, *Selection* and *Deck* are explained in [GLOSSA
 
 ## Installing
 
-The pilot installers are **not code-signed** yet, so macOS and Windows warn before the first start. This is expected during the pilot.
+Download the installer for your system from the project's GitHub **Releases** page. The installers are **not code-signed** yet, so macOS and Windows warn before the first start. This is expected.
 
 **macOS:** open `PBI2PPTX-0.1.0-macOS.dmg` and drag **PBI2PPTX** into **Applications**. On the first start, macOS says it can't check the app:
 1. Click **Done**.
@@ -187,26 +187,9 @@ When it's done, the panel shows a summary and each Entry's result:
 
 Each slide's **speaker notes** say where it came from: the report, the page, its address in Power BI, the Filters and the export time. That lets anyone trace a slide back later.
 
-## For developers: starting from the project folder
+## For developers
 
-Without the installer, you need [uv](https://docs.astral.sh/uv/) and [Node.js](https://nodejs.org/) 22 or newer. Once, and again whenever `ui/` changes:
-
-```bash
-uv sync
-npm --prefix ui install
-npm --prefix ui run build
-```
-
-Then:
-
-```bash
-uv run pbi2pptx                # prints the interface address; quit with Ctrl+C or from the interface
-uv run pbi2pptx --tray         # also show the menu bar / tray icon, like the installed app
-uv run pbi2pptx --no-open      # don't open the interface automatically
-uv run pbi2pptx --port 8765    # use a fixed port instead of any free one
-```
-
-Building the installers: `packaging/build_macos.sh` on a Mac, `packaging/build_windows.ps1` on Windows (needs Inno Setup). Alternatively, use the *Release build* workflow on GitHub.
+Running PBI2PPTX from the project folder, the tests and building the installers are covered in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
 ## What is stored, and where
 
