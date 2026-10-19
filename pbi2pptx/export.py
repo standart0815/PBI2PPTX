@@ -9,6 +9,7 @@ downloaded, a new Export starts, or an hour has passed (DESIGN.md, Data handling
 from __future__ import annotations
 
 import asyncio
+import logging
 import tempfile
 import time
 from dataclasses import asdict, dataclass, field
@@ -23,6 +24,7 @@ from .selection import Selection, safe_file_name
 from .window_service import WindowNotOpen, WindowService
 
 DECK_KEPT_SECONDS = 3600
+log = logging.getLogger("pbi2pptx.export")
 
 # Reasons on Error Slides and notes, in the Render Language.
 REASONS = {
@@ -157,12 +159,19 @@ class Exporter:
                     await asyncio.to_thread(build_deck, template, captured, out, selection.slide_layout, language)
                     self._deck, self._deck_made = out.read_bytes(), time.monotonic()
             progress.state, progress.phase, progress.file_name = ExportState.DONE, "", file_name
+            counts = {s: sum(1 for i in progress.entries if i.state is s) for s in EntryState}
+            log.info(
+                "Export done: %d captured, %d not verified, %d Error Slides",
+                counts[EntryState.CAPTURED], counts[EntryState.NOT_VERIFIED], counts[EntryState.ERROR_SLIDE],
+            )
         except WindowNotOpen as e:
+            log.warning("Export not started: %s", e)
             progress.state, progress.phase, progress.error = ExportState.FAILED, "", str(e)
         except asyncio.CancelledError:
             progress.state, progress.phase = ExportState.CANCELLED, ""
             raise
-        except Exception as e:  # noqa: BLE001 - shown in the interface
+        except Exception as e:  # noqa: BLE001 - shown in the interface, and logged for problem reports
+            log.exception("Export failed")
             progress.state, progress.phase, progress.error = ExportState.FAILED, "", f"The Export failed: {e}"
 
     async def _capture(self, window, entry, item: EntryProgress, out: Path, reasons: dict) -> CapturedEntry:
@@ -184,6 +193,7 @@ class Exporter:
             result.error = reasons["no_page"]
             item.state, item.message = EntryState.ERROR_SLIDE, "No report page at this address (deleted, or no access?)."
         except Exception as e:  # noqa: BLE001 - one failing page must not stop the Export
+            log.exception("Capturing an Entry failed")
             detail = str(e).splitlines()[0] if str(e) else type(e).__name__
             result.error = reasons["failed"].format(detail=detail)
             item.state, item.message = EntryState.ERROR_SLIDE, f"Could not capture: {detail}"

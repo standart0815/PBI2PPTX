@@ -112,3 +112,9 @@ def test_quitting_from_the_icon_stops_the_server_and_the_icon(monkeypatch):
 
     tray.run(on_open=lambda: None, on_quit=lambda: (events.append("quit"), stop.set()), server_thread=server_thread)
     assert events == ["icon shown", "quit", "icon stopped"]
+
+
+def test_self_test_passes_from_source(capsys):
+    from pbi2pptx.self_test import run
+
+    assert run() == 0, capsys.readouterr().err

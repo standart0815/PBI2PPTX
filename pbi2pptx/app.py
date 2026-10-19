@@ -96,8 +96,13 @@ def main(argv=None) -> None:
         help="show the menu bar / tray icon (default: on in the installed app, off when started from a terminal)",
     )
     parser.add_argument("--version", action="version", version=f"PBI2PPTX {__version__}")
+    parser.add_argument("--self-test", action="store_true", help="check the installation offline, then exit")
     args = parser.parse_args(argv)
     log_file = _setup_logging()
+    if args.self_test:
+        from .self_test import run as self_test
+
+        sys.exit(self_test())
 
     # Only one PBI2PPTX at a time: the Power BI Window's profile can't be shared.
     existing = _running_instance()
