@@ -79,6 +79,7 @@ Each step ends with something runnable and tested.
 5. **Template and settings.**
    - Pick the .potx, then list its layouts with the preselection and warnings, and choose the Render Language.
    - Done when: Firmenvorlage preselects "Tabelle" and shows the warnings found in Milestone 1.
+   - Status (2026-10-19): **done locally.** A Template is uploaded into memory only and described with layout geometry. The interface shows the layout list with the recommendation and warnings, a sketch of the chosen layout, and the Render Language. A Saved Selection's missing layout falls back to the recommendation. Checked with Firmenvorlage: "Tabelle" is preselected, and the same five layouts are warned as in Milestone 1. 73 tests in total. The file picker itself was not operated in the check: the upload went through the same API.
 6. **Export.**
    - Progress per Entry, cancel, Error Slides, Deck download named `<name> <YYYY-MM-DD>.pptx`.
    - Done when: a Selection of 20 Entries across all three routes exports into Firmenvorlage.

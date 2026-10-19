@@ -57,3 +57,31 @@ export function describeFilter(f: Filter): string {
 export function sameFilter(a: Filter, b: Filter): boolean {
   return a.table === b.table && a.column === b.column && a.values.join("\u0000") === b.values.join("\u0000");
 }
+
+// A Template as the server describes it (pbi2pptx/server.py, template_json).
+// Rectangles are fractions of the slide (0–1).
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export interface LayoutInfo {
+  name: string;
+  usable: boolean;
+  preselected: boolean;
+  imageArea: Rect | null;
+  title: Rect | null;
+  footers: Rect[];
+  graphics: (Rect & { name: string })[];
+}
+
+export interface TemplateInfo {
+  fileName: string;
+  slideWidthCm: number;
+  slideHeightCm: number;
+  templateSlides: number;
+  preselected: string | null;
+  layouts: LayoutInfo[];
+}

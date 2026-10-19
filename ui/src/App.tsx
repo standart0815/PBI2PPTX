@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, NotRunning, Status } from "./api";
 import { SelectionPanel } from "./SelectionPanel";
-import { emptySelection, Selection } from "./types";
+import { TemplatePanel } from "./TemplatePanel";
+import { emptySelection, Selection, TemplateInfo } from "./types";
 
 // The Selection survives a reload of this tab, and nothing more (sessionStorage).
 const STORAGE_KEY = "pbi2pptx-selection";
@@ -23,6 +24,12 @@ export function App() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selection, setSelectionState] = useState<Selection>(loadStoredSelection);
+  const [template, setTemplate] = useState<TemplateInfo | null>(null);
+
+  useEffect(() => {
+    // The server keeps the picked Template for this run, so a reload can show it again.
+    api.getTemplate().then((r) => r.template && setTemplate(r.template)).catch(() => undefined);
+  }, []);
 
   const setSelection = useCallback((update: (s: Selection) => Selection) => {
     setSelectionState((current) => {
@@ -104,6 +111,8 @@ export function App() {
         setSelection={setSelection}
         ready={status?.window.state === "open" && status.window.signed_in}
       />
+
+      <TemplatePanel template={template} setTemplate={setTemplate} selection={selection} setSelection={setSelection} />
 
       <footer className="bottom">
         <button className="quiet" onClick={quit}>
