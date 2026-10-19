@@ -20,5 +20,7 @@ jobs:
           enable-cache: true
       - name: Install
         run: uv sync --locked
+      - name: Install Chromium for the offline Power BI Window tests
+        run: uv run playwright install chromium
       - name: Test
         run: uv run pytest -q
