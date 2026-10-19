@@ -22,10 +22,10 @@ def entry(url, title, *filters):
     return Entry(url, title, "Beispielbericht", title, list(filters))
 
 
-async def run_export(tmp_path, selection, template, before=None):
+async def run_export(tmp_path, selection, template, before=None, today=None):
     service, _ = service_for(tmp_path)
     await service.start()
-    exporter = Exporter(service)
+    exporter = Exporter(service, today=lambda: today) if today else Exporter(service)
     try:
         if before:
             await before(service)
@@ -145,3 +145,59 @@ def test_show_filters_puts_a_filter_box_on_filtered_slides(tmp_path, sample_temp
     (filter_box,) = [s for s in with_filters.shapes if s.name == "Filter Box"]
     assert filter_box.text_frame.text.splitlines() == ["Filter", "Country: Germany"]
     assert all(s.name != "Filter Box" for s in without.shapes)
+
+
+
+# --- Date Filters -------------------------------------------------------------------------------
+
+from datetime import date  # noqa: E402
+
+from pbi2pptx.dates import DateRule  # noqa: E402
+from pbi2pptx.page_url import DateFilter  # noqa: E402
+
+LAST_YEAR = DateFilter("Calendar", "Date", DateRule.START_OF_LAST_YEAR, DateRule.END_OF_LAST_YEAR)
+SINCE_JUNE = DateFilter("Calendar", "Date", start=date(2013, 6, 1))
+
+
+def notes_of(slide) -> str:
+    return slide.notes_slide.notes_text_frame.text
+
+
+@pytest.mark.parametrize(
+    "language, box, note",
+    [
+        ("de-DE", ["Filter", "Date: 01.01.2013 – 31.12.2013", "Date: ab 01.06.2013"],
+         "Calendar/Date: 01.01.2013 (Anfang letzten Jahres) – 31.12.2013 (Ende letzten Jahres)"),
+        ("en-US", ["Filters", "Date: 01/01/2013 – 12/31/2013", "Date: from 06/01/2013"],
+         "Calendar/Date: 01/01/2013 (Start of last year) – 12/31/2013 (End of last year)"),
+    ],
+)
+def test_date_rules_are_worked_out_when_the_export_starts(tmp_path, sample_template, language, box, note):
+    selection = Selection("Pack", [entry(WS_PAGE, "Last year", LAST_YEAR, SINCE_JUNE)], render_language=language, show_filters=True)
+    exporter, _ = asyncio.run(run_export(tmp_path, selection, sample_template.read_bytes(), today=date(2014, 1, 15)))
+    (item,) = exporter.progress.entries
+    assert item.state is EntryState.CAPTURED  # Power BI showed a card for each end
+    (slide,) = slides(exporter.deck()[1])
+    (filter_box,) = [s for s in slide.shapes if s.name == "Filter Box"]
+    assert filter_box.text_frame.text.splitlines() == box
+    assert note in notes_of(slide)
+
+
+def test_impossible_pages_become_error_slides(tmp_path, sample_template):
+    this_month_so_far = DateFilter("Calendar", "Date", DateRule.START_OF_THIS_MONTH, DateRule.YESTERDAY)
+    many = [Filter("financials", "Segment", (f"S{i}",)) for i in range(9)]
+    long = Filter("financials", "Country", tuple(f"Country number {i}" for i in range(80)))
+    selection = Selection(
+        "Pack",
+        [
+            entry(WS_PAGE, "Empty on the 1st", this_month_so_far),
+            entry(WS_PAGE, "Eleven conditions", LAST_YEAR, *many),
+            entry(WS_PAGE, "Too long", long),
+        ],
+    )
+    exporter, _ = asyncio.run(run_export(tmp_path, selection, sample_template.read_bytes(), today=date(2026, 11, 1)))
+    assert [e.state for e in exporter.progress.entries] == [EntryState.ERROR_SLIDE] * 3
+    empty, eleven, too_long = (text_of(s) for s in slides(exporter.deck()[1]))
+    assert "Calendar/Date" in empty and "01.11.2026" in empty and "31.10.2026" in empty
+    assert "11" in eleven and "10" in eleven
+    assert "2.000" in too_long or "2000" in too_long

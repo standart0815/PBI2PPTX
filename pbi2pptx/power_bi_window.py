@@ -13,6 +13,7 @@ import re
 import shutil
 import time
 from dataclasses import dataclass, field
+from datetime import timedelta
 from enum import Enum
 from pathlib import Path
 from typing import Sequence
@@ -20,8 +21,8 @@ from typing import Sequence
 from playwright.async_api import BrowserContext, Page, async_playwright
 
 from . import power_bi_ui as ui
-from .page_url import Filter, PageUrl, is_app_link, parse_page_url
-from .set_filters import FilterCard, Slicer, TakeOver, take_over
+from .page_url import DateFilter, Filter, PageUrl, is_app_link, parse_page_url
+from .set_filters import FilterCard, Slicer, TakeOver, split_field, take_over
 
 
 def profile_dir() -> Path:
@@ -101,6 +102,15 @@ class FiltersNotApplied(RuntimeError):
         self.missing = missing
 
 
+@dataclass(frozen=True)
+class ShownCard:
+    """A Filter Pane card as verification reads it."""
+
+    title: str  # e.g. "Country ist Germany oder France"
+    field: str  # e.g. '"financials"[Country]'
+    condition: str  # e.g. "ist Germany oder France"
+
+
 def card_shows(title: str, f: Filter) -> bool:
     """Whether a filter card title such as "Country ist Germany oder France" shows exactly the Filter's values."""
     if not title.startswith(f.column + " "):
@@ -108,6 +118,25 @@ def card_shows(title: str, f: Filter) -> bool:
     _operator, _, shown = title[len(f.column) + 1 :].partition(" ")  # "ist" / "is"
     values = {v.strip() for v in re.split(ui.FILTER_CARD_VALUE_SEPARATORS, shown)}
     return set(f.values) <= values
+
+
+def date_cards_show(cards: Sequence[ShownCard], f: DateFilter) -> bool:
+    """Whether every end of a Date Filter (fixed dates) shows as its own card on the same field.
+
+    "From X" is sent as "on or after X", and "to Y" as "before the day after Y"."""
+    expected = []
+    if f.start is not None:
+        expected.append({p + d for p, d in zip(ui.DATE_ON_OR_AFTER, ui.date_shown(f.start))})
+    if f.end is not None:
+        expected.append({p + d for p, d in zip(ui.DATE_BEFORE, ui.date_shown(f.end + timedelta(days=1)))})
+    on_field = [c.condition for c in cards if split_field(c.field) == (f.table, f.column)]
+    return all(any(c in texts for c in on_field) for texts in expected)
+
+
+def filter_shown(cards: Sequence[ShownCard], f: Filter | DateFilter) -> bool:
+    if isinstance(f, DateFilter):
+        return date_cards_show(cards, f)
+    return any(card_shows(c.title, f) for c in cards)
 
 
 class PowerBIWindow:
@@ -242,8 +271,10 @@ class PowerBIWindow:
 
     # --- Capturing ---------------------------------------------------------------------------
 
-    async def capture(self, page_url: PageUrl, filters: Sequence[Filter], out: Path) -> CaptureReport:
-        """Capture one Report Page in its Default State with its Filters applied, as a PNG."""
+    async def capture(self, page_url: PageUrl, filters: Sequence[Filter | DateFilter], out: Path) -> CaptureReport:
+        """Capture one Report Page in its Default State with its Filters applied, as a PNG.
+
+        Date Filters must have fixed dates (DateFilter.on)."""
         started = time.monotonic()
         report = CaptureReport()
 
@@ -301,14 +332,15 @@ class PowerBIWindow:
         report.seconds = round(time.monotonic() - started, 1)
         return report
 
-    async def check_filters(self, page_url: PageUrl, filters: Sequence[Filter]) -> FilterVerdict:
+    async def check_filters(self, page_url: PageUrl, filters: Sequence[Filter | DateFilter]) -> FilterVerdict:
         """For the "Check" button: open the page with its Filters and verify them, without capturing."""
         await self._open(page_url.with_filters(filters))
         await self._dismiss_overlays()
         return await self.verify_filters(filters)
 
-    async def verify_filters(self, filters: Sequence[Filter]) -> FilterVerdict:
-        """Read Power BI's filter pane: every Filter it applied shows as a card with its values."""
+    async def verify_filters(self, filters: Sequence[Filter | DateFilter]) -> FilterVerdict:
+        """Read Power BI's filter pane: every Filter it applied shows as a card with its values,
+        and every end of a Date Filter as a card with its date."""
         if not filters:
             return FilterVerdict(FilterCheck.NO_FILTERS)
         opened = False
@@ -321,8 +353,16 @@ class PowerBIWindow:
                 await self.page.locator(ui.FILTER_CARD_TITLES).first.wait_for(state="visible", timeout=10_000)
             except Exception:  # noqa: BLE001 - pane without cards: nothing applied
                 pass
-        titles = [" ".join(t.split()) for t in await self.page.locator(ui.FILTER_CARD_TITLES).all_inner_texts()]
-        missing = tuple(f for f in filters if not any(card_shows(t, f) for t in titles))
+        raw = await self.page.evaluate(
+            """([cards, field, restatement]) => [...document.querySelectorAll(cards)].map(card => ({
+                title: card.innerText,
+                field: card.querySelector(field)?.getAttribute('title') || '',
+                condition: card.querySelector(restatement)?.getAttribute('title') || '',
+            }))""",
+            [ui.FILTER_CARD_TITLES, ui.FILTER_CARD_FIELD, ui.FILTER_CARD_RESTATEMENT],
+        )
+        cards = [ShownCard(" ".join(c["title"].split()), c["field"], " ".join(c["condition"].split())) for c in raw]
+        missing = tuple(f for f in filters if not filter_shown(cards, f))
         if opened:
             await self._click(ui.FILTER_PANE_TOGGLE_TEXTS)  # close it again: the open pane narrows the canvas
             try:
@@ -361,7 +401,7 @@ class PowerBIWindow:
             await self.page.wait_for_timeout(self.settle_ms)
 
         raw_slicers = await self.page.evaluate(
-            """([slicer, header, item, dropdown, range, selectAll]) => [...document.querySelectorAll('.visualContainer')]
+            """([slicer, header, item, dropdown, range, selectAll, labels]) => [...document.querySelectorAll('.visualContainer')]
                 .filter(v => v.matches(slicer))
                 .map(v => {
                     const items = [...v.querySelectorAll(item)];
@@ -372,19 +412,21 @@ class PowerBIWindow:
                     for (let e = items[0]?.parentElement; e && e !== v; e = e.parentElement)
                         if (e.scrollHeight > e.clientHeight + 2) { scrollable = true; break; }
                     const drop = v.querySelector(dropdown);
+                    const isRange = !!v.querySelector(range);
                     return {
                         column: (v.querySelector(header)?.innerText || '').trim(),
-                        kind: v.querySelector(range) ? 'range' : drop ? 'dropdown' : 'list',
+                        kind: isRange ? 'range' : drop ? 'dropdown' : items.length ? 'list' : 'other',
+                        labels: isRange ? [...v.querySelectorAll(labels)].map(e => e.getAttribute('aria-label')) : [],
                         ticked: values,
                         selectAll: all ? all.getAttribute('aria-checked') || '' : '',
                         dropdownText: drop ? drop.innerText.trim() : '',
                         scrollable,
                     };
                 })""",
-            [ui.SLICER, ui.SLICER_HEADER, ui.SLICER_ITEM, ui.SLICER_DROPDOWN, ui.SLICER_RANGE, list(ui.SELECT_ALL)],
+            [ui.SLICER, ui.SLICER_HEADER, ui.SLICER_ITEM, ui.SLICER_DROPDOWN, ui.SLICER_RANGE, list(ui.SELECT_ALL), ui.SLICER_LABELS],
         )
         slicers = [
-            Slicer(s["column"], s["kind"], tuple(s["ticked"]), s["selectAll"], s["dropdownText"], s["scrollable"])
+            Slicer(s["column"], s["kind"], tuple(s["ticked"]), s["selectAll"], s["dropdownText"], s["scrollable"], tuple(s["labels"]))
             for s in raw_slicers
             if s["column"]
         ]

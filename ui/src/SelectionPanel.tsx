@@ -1,7 +1,9 @@
 import { FormEvent, useRef, useState } from "react";
 import { api, Refused, saveFile } from "./api";
 import { EntryItem } from "./EntryItem";
-import { Entry, EntryJson, Filter, LeftOut, MAX_ENTRIES, sameFilter, Selection, toJson, withId } from "./types";
+import { FilterOverview } from "./FilterOverview";
+import { sameFilter } from "./filters";
+import { Entry, EntryJson, Filter, LeftOut, MAX_ENTRIES, Selection, toJson, withId } from "./types";
 
 type Notice = { kind: "info" | "problem"; text: string; leftOut?: LeftOut[] } | null;
 
@@ -262,6 +264,10 @@ export function SelectionPanel({
             />
           ))}
         </ol>
+      )}
+
+      {entries.some((e) => e.filters.length > 0) && (
+        <FilterOverview entries={entries} onChange={(next) => setSelection((s) => ({ ...s, entries: next }))} />
       )}
     </section>
   );

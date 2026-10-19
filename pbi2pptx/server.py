@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import secrets
+from datetime import date
 from pathlib import Path
 from typing import Callable, Iterable
 from urllib.parse import quote, unquote
@@ -22,9 +23,9 @@ from starlette.staticfiles import StaticFiles
 
 from . import __version__, static_dir
 from .export import Exporter, ExportRefused
-from .page_url import Filter, parse_page_url
+from .page_url import DateFilter, filter_from_json, parse_page_url
 from .power_bi_window import CurrentPage, FilterCheck, NotAReportPage
-from .selection import Entry, Selection, SelectionError
+from .selection import SCHEMA_VERSION, Entry, Selection, SelectionError
 from .template import Box, NotATemplate, TemplateInfo, describe_template
 from .window_service import Busy, WindowNotOpen, WindowService
 
@@ -172,7 +173,7 @@ def create_app(
     async def save_selection(request: Request) -> Response:
         data = (await json_body(request)).get("selection")
         try:
-            selection = Selection.from_json({**(data or {}), "schemaVersion": 1})
+            selection = Selection.from_json({**(data or {}), "schemaVersion": SCHEMA_VERSION})
         except SelectionError as e:
             return problem(422, str(e))
         return JSONResponse({"fileName": selection.file_name(), "content": selection.dumps()})
@@ -200,9 +201,11 @@ def create_app(
         body = await json_body(request)
         try:
             page_url = parse_page_url(str(body.get("pageUrl", "")))
-            flt = Filter.from_json(body.get("filter") or {})
+            flt = filter_from_json(body.get("filter") or {}).on(date.today())
         except (ValueError, AttributeError):
             return problem(422, "A Filter check needs a page address and a complete Filter.")
+        if isinstance(flt, DateFilter) and flt.empty:
+            return problem(422, f"This date range is empty today: from {flt.start:%Y-%m-%d} is after to {flt.end:%Y-%m-%d}.")
         try:
             verdict = await service.check_filters(page_url, [flt])
         except (WindowNotOpen, Busy) as e:
@@ -211,14 +214,15 @@ def create_app(
             return problem(422, str(e))
         messages = {
             FilterCheck.APPLIED: "Power BI applied it.",
-            FilterCheck.NOT_APPLIED: f"Power BI didn't recognise {flt.table} / {flt.column}. Check the table and column names.",
+            FilterCheck.NOT_APPLIED: f"Power BI didn't recognise {flt.table} / {flt.column}. Check the table and column names"
+            + (", and that the column holds dates." if isinstance(flt, DateFilter) else "."),
             FilterCheck.NOT_VERIFIABLE: "Can't check: this report hides its filter pane.",
         }
         return JSONResponse({"result": verdict.check.value, "message": messages.get(verdict.check, "")})
 
     async def start_export(request: Request) -> Response:
         try:
-            selection = Selection.from_json({**((await json_body(request)).get("selection") or {}), "schemaVersion": 1})
+            selection = Selection.from_json({**((await json_body(request)).get("selection") or {}), "schemaVersion": SCHEMA_VERSION})
             exporter.start(selection, template.get("data"))
         except (SelectionError, ExportRefused) as e:
             return problem(409 if isinstance(e, ExportRefused) else 422, str(e))

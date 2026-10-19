@@ -55,7 +55,7 @@ def test_missing_titles_fall_back_to_the_page_name():
     [
         ("not json", "not valid JSON"),
         ('{"hello": "world"}', "not a Saved Selection"),
-        ('{"schemaVersion": 2, "entries": []}', "newer PBI2PPTX"),
+        ('{"schemaVersion": 3, "entries": []}', "newer PBI2PPTX"),
         ('{"schemaVersion": 1, "entries": [{"pageUrl": "https://example.com"}]}', "Entry 1 has no valid Power BI page address"),
         (
             json.dumps({"schemaVersion": 1, "entries": [{"pageUrl": PAGE, "filters": [{"table": "t", "values": ["x"]}]}]}),
@@ -85,3 +85,44 @@ def test_older_files_without_the_filter_setting_show_no_filters():
     data = selection().to_json()
     del data["showFilters"]
     assert Selection.from_json(data).show_filters is False
+
+
+# --- Date Filters (format version 2) ------------------------------------------------------------
+
+from datetime import date  # noqa: E402
+
+from pbi2pptx.dates import DateRule  # noqa: E402
+from pbi2pptx.page_url import DateFilter  # noqa: E402
+
+YEAR_TO_DATE = DateFilter("Calendar", "Date", DateRule.START_OF_THIS_YEAR, DateRule.TODAY)
+
+
+def test_date_filters_round_trip_in_format_version_2():
+    original = selection()
+    original.entries[0].filters = [YEAR_TO_DATE, DateFilter("Calendar", "Date", end=date(2026, 10, 19))]
+    data = json.loads(original.dumps())
+    assert data["schemaVersion"] == 2
+    assert data["entries"][0]["filters"] == [
+        {"table": "Calendar", "column": "Date", "from": {"rule": "startOfThisYear"}, "to": {"rule": "today"}},
+        {"table": "Calendar", "column": "Date", "from": None, "to": {"date": "2026-10-19"}},
+    ]
+    assert Selection.loads(original.dumps()) == original
+
+
+def test_files_without_date_filters_stay_readable_for_older_versions():
+    assert json.loads(selection().dumps())["schemaVersion"] == 1
+
+
+@pytest.mark.parametrize(
+    "date_filter, message",
+    [
+        ({"from": None, "to": None}, "needs a from or a to"),
+        ({"from": {"rule": "nextFullMoon"}}, "unknown Date Rule"),
+        ({"from": {"date": "19.10.2026"}}, "not a date"),
+        ({"from": {"date": "2026-10-20"}, "to": {"date": "2026-10-19"}}, "from is after to"),
+    ],
+)
+def test_broken_date_filters_are_refused(date_filter, message):
+    entry = {"pageUrl": PAGE, "filters": [{"table": "Calendar", "column": "Date", **date_filter}]}
+    with pytest.raises(SelectionError, match=f"Entry 1: .*{message}"):
+        Selection.from_json({"schemaVersion": 2, "entries": [entry]})

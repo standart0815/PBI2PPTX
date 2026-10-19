@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { api } from "./api";
 import { FilterEditor } from "./FilterEditor";
-import { describeFilter, Entry, Filter, reachedThrough } from "./types";
+import { describeFilter, limitWarning } from "./filters";
+import { Entry, Filter, reachedThrough } from "./types";
 
 export function EntryItem({
   entry,
@@ -35,6 +36,7 @@ export function EntryItem({
   };
 }) {
   const [showFilters, setShowFilters] = useState(false);
+  const warning = limitWarning(entry);
 
   return (
     <li
@@ -62,6 +64,7 @@ export function EntryItem({
             {entry.pageName}
             {entry.reportName && ` · ${entry.reportName}`} · {reachedThrough(entry.pageUrl)}
           </p>
+          {warning && <p className="warning small">{warning}</p>}
           {entry.filters.length > 0 && (
             <p className="small chips">
               {entry.filters.map((f, i) => (

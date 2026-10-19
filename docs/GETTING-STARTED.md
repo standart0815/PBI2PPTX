@@ -67,7 +67,8 @@ A Selection is the ordered list of pages that will become your Deck, one slide p
 
 - **Add current page:** open a report page in the Power BI Window, from a Workspace, My workspace or a Power BI App, then click **Add current page**. PBI2PPTX takes the page that is showing.
   - With **Include the filters I set** ticked (the default, and remembered), the Entry also takes over what you set on the page: filters in Power BI's **Filter Pane** and selections in its **slicers**, such as "Discount Band: Low, Medium". They become ordinary Filters that you can edit or check.
-  - Only "column is one of these text values" can be taken over. Everything else is listed under **Not taken over**, with the reason: date or number ranges (such as a date slider), "is not", contains, greater than, Top N, relative dates, number or date values, and slicers whose table PBI2PPTX can't find. Add those by hand in the Filter form if you need them.
+  - Taken over are "column is one of these text values", and **date ranges**: a date slider's chosen from–to, and date conditions in the Filter Pane such as "ist am oder nach 01.06.2013". All date settings on one column become one Date Filter with fixed dates. A date slider over its whole range isn't a filter.
+  - Everything else is listed under **Not taken over**, with the reason: number ranges, "is not", contains, greater than, Top N, relative dates, number or date values, and slicers whose table PBI2PPTX can't find. Add those by hand in the Filter form if you need them.
   - Whatever shows "Alle"/"All" isn't a filter and is skipped.
   - On the slide, a slicer may still show its full list even though the data is filtered. Turn on **Show Filters on slides** to make clear what applies.
 - **Paste address:** click **Paste address** and paste either a page's address from the browser's address bar, or a **shared App link** (`…/Redirect?action=OpenApp…`). PBI2PPTX opens it in the Power BI Window and adds the page it lands on.
@@ -91,6 +92,13 @@ Click **Filters** on an Entry to restrict what the page shows on its slide, for 
 | Column | `Country` | The column's name in that table |
 | Values | `Germany, France` | One or more values, separated by commas |
 
+For a real date column, such as `Calendar` / `Date`, choose **Date range** instead of Values. **From** and **To** both count in full, so a single day is from = to. Each end is:
+- **None (open)**: no limit on that side.
+- **Fixed date**: picked in the calendar.
+- **A Date Rule**: Today, Yesterday, Start of this month, Start of last month, End of last month, Start of this year, Start of last year or End of last year. Rules are worked out when the Export starts, from your computer's date, so a saved Selection "from Start of this year to Today" moves along by itself from one Export to the next.
+
+A fixed range whose from is after its to is refused. Year or month columns stored as numbers or text ("2026", "Oktober") can't take a date range.
+
 **Add Filter** adds it. **Apply to all Entries** copies it to every Entry, for example to build the same pack for one region. Without Filters, a page is captured as published.
 
 **Check** opens the page with that Filter in the Power BI Window and tells you, in about 10 seconds, whether Power BI applied it:
@@ -105,13 +113,25 @@ Mistakes Power BI itself doesn't report:
 - **A value that doesn't exist** empties the visuals, and the slide shows **empty tables and charts**.
 - **A value made only of digits**, such as `2026`, is treated as a number. On a text column, that Filter won't match.
 
+Power BI accepts at most **10 filter conditions** per page, and a page address of about **2,000 characters**. A Date Filter with from and to counts as two. An Entry over either limit shows a warning, and the Export gives it an Error Slide.
+
+### Filter Overview
+
+Below the Entries, **Filter Overview** lists every Filter of the Selection, grouped by column, such as "Calendar / Date · 12 Entries". Open it to change many Filters at once, for example to move every date range up to today:
+
+1. Tick the Filters you want, or the column's box for all of them. You can only tick within one column at a time.
+2. **Edit selected** sets the same values or date range on all of them. For a date range, each end starts at **Keep as is**: set **To** to **Today** and leave **From** as it is, and every page keeps its own start.
+3. **Remove selected** takes them out of their Entries, after asking.
+
+If the change would leave any page with a from after its to, nothing is changed and the overview names the Entries.
+
 ### Saving and opening
 
 - **Save** downloads the Selection as `<name>.json` into your downloads folder. The name comes from the field at the top, without characters that file names can't hold.
 - **Open…** loads a saved file. It replaces the current Selection, after asking.
 - **New** starts an empty Selection, after asking.
 
-A Saved Selection holds the page addresses, titles and Filters, but no report data. A colleague can open your file; pages they can't access will fail at export.
+A Saved Selection holds the page addresses, titles and Filters, but no report data. A colleague can open your file; pages they can't access will fail at export. A file with Date Filters needs this version of PBI2PPTX or newer; older versions say it "comes from a newer PBI2PPTX".
 
 The Selection also survives a reload of the interface tab. **Quit** and closing the tab don't keep it, so save first.
 
@@ -134,7 +154,7 @@ Every page slide uses the same layout from the Template. PBI2PPTX recommends one
 
 ### Filters on slides
 
-**Show Filters on slides** adds a **Filter Box** to every slide whose Entry has Filters. It lists them under the heading "Filter" ("Filters" in English), one line each, such as "Country: Germany, France". The box sits to the right of the page, top-aligned, in the template's font and colour.
+**Show Filters on slides** adds a **Filter Box** to every slide whose Entry has Filters. It lists them under the heading "Filter" ("Filters" in English), one line each, such as "Country: Germany, France". Date Filters show the dates used, in the Render Language: "Date: 01.01.2026 – 19.10.2026", "Date: ab 01.01.2026" or "Date: bis 19.10.2026" ("from …", "until …" in English). The speaker notes also name the Date Rule, such as "19.10.2026 (Heute)". The box sits to the right of the page, top-aligned, in the template's font and colour.
 
 - If the page leaves enough room on the right (at least a fifth of the picture area), the page keeps its size.
 - Otherwise the page is made just narrow enough.
@@ -161,7 +181,7 @@ When it's done, the panel shows a summary and each Entry's result:
 |---|---|---|
 | ✓ | Captured, and every Filter was applied | The page |
 | ? | Captured, but its Filters couldn't be verified because the report hides its filter pane | The page; the speaker notes say "Filter-Prüfung: nicht möglich" |
-| ✗ | Not captured: page deleted, no access, or a Filter Power BI didn't apply | An **Error Slide** naming the page and the reason |
+| ✗ | Not captured: page deleted, no access, a Filter Power BI didn't apply, a date range that is empty on the day of the Export (such as "Start of this month to Yesterday" on the 1st), or more Filters than Power BI accepts | An **Error Slide** naming the page and the reason |
 
 **Download Deck** saves `<Selection name> <date>.pptx` into your downloads folder. The Deck stays available until you export again or quit PBI2PPTX, at most one hour. The Page Images are deleted as soon as the Export ends.
 

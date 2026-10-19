@@ -57,3 +57,50 @@ def test_no_filters_leaves_the_url_alone():
 def test_rejects_malformed_filters(text):
     with pytest.raises(ValueError):
         Filter.parse(text)
+
+
+# --- Date Filters -------------------------------------------------------------------------------
+
+from datetime import date  # noqa: E402
+
+from pbi2pptx.page_url import DateFilter  # noqa: E402
+
+
+def test_date_filter_sends_the_end_day_as_before_the_next_day():
+    between = DateFilter("Calendar", "Date", date(2026, 1, 1), date(2026, 10, 19))
+    assert filter_expression([between]) == "Calendar/Date ge 2026-01-01 and Calendar/Date lt 2026-10-20"
+    assert filter_expression([DateFilter("Calendar", "Date", start=date(2026, 1, 1))]) == "Calendar/Date ge 2026-01-01"
+    assert filter_expression([DateFilter("Calendar", "Date", end=date(2026, 12, 31))]) == "Calendar/Date lt 2027-01-01"
+
+
+from pbi2pptx.dates import DateRule  # noqa: E402
+
+
+def test_date_rules_are_worked_out_on_the_day_of_the_export():
+    year_to_date = DateFilter("Calendar", "Date", DateRule.START_OF_THIS_YEAR, DateRule.TODAY)
+    assert year_to_date.on(date(2026, 10, 19)) == DateFilter("Calendar", "Date", date(2026, 1, 1), date(2026, 10, 19))
+
+
+@pytest.mark.parametrize(
+    "rule, on_1_march, on_15_january",
+    [
+        (DateRule.TODAY, date(2026, 3, 1), date(2026, 1, 15)),
+        (DateRule.YESTERDAY, date(2026, 2, 28), date(2026, 1, 14)),
+        (DateRule.START_OF_THIS_MONTH, date(2026, 3, 1), date(2026, 1, 1)),
+        (DateRule.START_OF_LAST_MONTH, date(2026, 2, 1), date(2025, 12, 1)),
+        (DateRule.END_OF_LAST_MONTH, date(2026, 2, 28), date(2025, 12, 31)),
+        (DateRule.START_OF_THIS_YEAR, date(2026, 1, 1), date(2026, 1, 1)),
+        (DateRule.START_OF_LAST_YEAR, date(2025, 1, 1), date(2025, 1, 1)),
+        (DateRule.END_OF_LAST_YEAR, date(2025, 12, 31), date(2025, 12, 31)),
+    ],
+)
+def test_each_date_rule(rule, on_1_march, on_15_january):
+    assert DateFilter("Calendar", "Date", end=rule).on(date(2026, 3, 1)).end == on_1_march
+    assert DateFilter("Calendar", "Date", start=rule).on(date(2026, 1, 15)).start == on_15_january
+
+
+def test_fixed_dates_stay_as_they_are():
+    fixed = DateFilter("Calendar", "Date", date(2025, 6, 1))
+    assert fixed.on(date(2026, 10, 19)) == fixed
+    country = Filter.parse("financials/Country=Germany")
+    assert country.on(date(2026, 10, 19)) == country

@@ -1,11 +1,36 @@
 // The Selection as the interface holds it. The JSON shape matches pbi2pptx/selection.py;
 // `id` exists only in the interface, as a stable key for editing and reordering.
 
-export interface Filter {
+/** "Column is one of these values". */
+export interface ValueFilter {
   table: string;
   column: string;
   values: string[];
 }
+
+/** A named date worked out when the Export starts (pbi2pptx/dates.py). */
+export type DateRule =
+  | "today"
+  | "yesterday"
+  | "startOfThisMonth"
+  | "startOfLastMonth"
+  | "endOfLastMonth"
+  | "startOfThisYear"
+  | "startOfLastYear"
+  | "endOfLastYear";
+
+/** One end of a Date Filter: a fixed date ("2026-10-19"), a Date Rule, or none. */
+export type DateEnd = { date: string } | { rule: DateRule } | null;
+
+/** A Filter on a date column, from and/or to, both inclusive. */
+export interface DateFilter {
+  table: string;
+  column: string;
+  from: DateEnd;
+  to: DateEnd;
+}
+
+export type Filter = ValueFilter | DateFilter;
 
 export interface Entry {
   id: string;
@@ -56,14 +81,6 @@ export function reachedThrough(pageUrl: string): string {
   if (pageUrl.includes("/apps/")) return "Power BI App";
   if (pageUrl.includes("/groups/me/")) return "My workspace";
   return "Workspace";
-}
-
-export function describeFilter(f: Filter): string {
-  return `${f.table} / ${f.column} = ${f.values.join(", ")}`;
-}
-
-export function sameFilter(a: Filter, b: Filter): boolean {
-  return a.table === b.table && a.column === b.column && a.values.join("\u0000") === b.values.join("\u0000");
 }
 
 // A Template as the server describes it (pbi2pptx/server.py, template_json).

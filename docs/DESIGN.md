@@ -16,7 +16,15 @@ Terms are defined in [GLOSSARY.md](../GLOSSARY.md). The decisions behind the des
    - **"Add current page"** adds the page currently showing as an Entry. With the checkbox **"Include the filters I set"** (on by default, remembered by the interface), the Entry also takes over the page's current filters:
      - **What's taken over:** what the Filter Pane and the page's slicers show, as far as it can be written as "column = values". That includes author defaults, which is harmless because the page looks the same.
      - **What's skipped:** filters and slicers showing "Alle"/"All".
-     - **What's left out:** ranges (such as a date slider), Top N, relative dates and click highlights. The interface's notice lists them with the reason. Nothing about them appears on the slide.
+     - **What's left out:** Top N, relative date slicers (Q81) and click highlights. The interface's notice lists them with the reason. Nothing about them appears on the slide.
+     - **Date slicers** (Q80): the chosen from–to becomes a Date Filter with fixed dates. If the slicer covers its whole available range, nothing is taken over, as with "Alle".
+     - **Date cards in the Filter Pane** (Q90): a date range set in the pane, or by a page address, shows as separate cards for each end. They become one Date Filter with fixed dates:
+       - "ist am oder nach X" / "is on or after X" gives from = X
+       - "ist nach X" / "is after X" gives from = the day after X
+       - "ist am oder vor Y" / "is on or before Y" gives to = Y
+       - "ist vor Y" / "is before Y" gives to = the day before Y
+
+       A date slicer then adds nothing of its own: Power BI narrows the slicer's available range to these cards (checked 2026-10-19).
      - **Table and column:** each Filter Pane card carries its full field name in a hidden label, such as `"financials"[Country]` (checked 2026-10-19). Slicers show only the column's display name. They take their table from a Filter Pane card with the same column. Without such a card, the slicer is left out with the note "table unknown: add this Filter by hand".
      - **Also left out, with a note:**
        - filters other than a plain "is one of": "ist nicht" (is not), contains, greater than, Top N, relative dates
@@ -27,9 +35,21 @@ Terms are defined in [GLOSSARY.md](../GLOSSARY.md). The decisions behind the des
    - Filters are entered in a small form (table, column, values). The tool turns them into Power BI's URL filter syntax, for example `?filter=Table/Column in ('A','B')`. An "apply to all Entries" button covers the "same pack for each region or month" case.
    - Each Filter has an optional **"Check"** button. It opens the page with that Filter in the Power BI Window and reports whether Power BI applied it (see Filter verification).
    - Entries can be reordered by drag and drop, can repeat the same page, and can mix Reports from different Workspaces and Power BI Apps.
+   - **Date Filters** (decisions Q77–Q79, Q83): a Filter on a real date column, such as `Calendar[Date]`, can be a date range instead of "is one of these values".
+     - It has a **from** and/or a **to**, both inclusive, so a single day is from = to. The end day always counts in full, even on columns that store a time: the page address says "before the next day".
+     - Each end is **none**, a **fixed date**, or a **Date Rule**: Today, Yesterday, Start of this month, Start of last month, End of last month, Start of this year, Start of last year, End of last year.
+     - Rules are worked out when the Export starts: "Today" is the date on the User's computer then, one date for the whole Export. A Saved Selection therefore moves along by itself from one Export to the next.
+     - Year or month columns stored as numbers or text are out of scope.
+     - The Filter form refuses fixed ranges where from is after to.
+   - **Filter Overview** (Q75, Q76, Q82, Q84): a collapsible section below the Entry list.
+     - It lists every Filter of the Selection, grouped by field ("Calendar / Date: 12 Entries"), each with a checkbox naming its Entry, plus "select all" per field.
+     - Selection works within one field at a time. **Edit selected** sets the same values or date range on every selected Filter, and **Remove selected** removes them.
+     - For a date range, each end also offers **"keep as is"**, preselected. "to = Today" with from = "keep as is" changes only the end and keeps each page's own start.
+   - **Limits** (Q86): Power BI allows at most 10 conditions and about 2,000 characters per page address, and a Date Filter with both ends counts as two. The interface warns on an Entry over the limit.
 3. **Saved Selection**
    - The Selection has a name and is saved as `<name>.json` wherever the User chooses.
    - The file holds the Page URLs, a snapshot of their names, slide titles, Filters, the Slide Layout name, the Render Language and the "Show Filters on slides" setting. It does not contain the Template.
+   - Files with Date Filters use format version 2 (Q89). Older PBI2PPTX versions refuse them with "comes from a newer PBI2PPTX". The new version opens every older file.
    - A colleague can open someone else's file.
 4. **Export**
    - The User picks the Template (.potx), a Slide Layout (see [Slide composition](#slide-composition) for which one is preselected) and the Render Language (German by default, English possible).
@@ -45,6 +65,7 @@ Terms are defined in [GLOSSARY.md](../GLOSSARY.md). The decisions behind the des
      - **Applied:** the card is there with every value. The page is captured.
      - **Not applied:** the card is missing or lacks a value. The Entry becomes an **Error Slide** naming the Filter ("financials/Land was not applied: check the table and column name"). The Export carries on.
      - **Not verifiable:** the report hides its filter pane. The page is captured, and the speaker notes and the Export summary say "Filter not verified".
+     - **Date Filters** (Q91): each end must show as its own card with the expected date in the interface's language. "To 19.10.2026" is sent as "before 20.10.2026", so the card reads "ist vor 20.10.2026" / "is before 10/20/2026". "From" reads "ist am oder nach …" / "is on or after …". A missing card means not applied.
      - **Values that don't exist** (for example "Atlantis") are accepted by Power BI and give empty visuals. They are not detected: the slide is visibly empty, and the Export summary lists every Entry's Filters for review.
 6. **Slides**: see [Slide composition](#slide-composition).
 7. **Result**
@@ -66,6 +87,8 @@ Terms are defined in [GLOSSARY.md](../GLOSSARY.md). The decisions behind the des
   - It fills the full width whenever the height allows.
   - Example: a 16:9 page on a 33.9 × 19.1 cm slide whose header ends at 3 cm becomes 28.5 × 16.1 cm, with 5.3 cm left empty on the right.
 - Pages with unusual sizes, such as tall scrolling pages, are fitted whole.
+- **Dates on slides** (Q87): in the Render Language, e.g. "Date: 01.01.2026 – 19.10.2026" (Deutsch) or "Date: 01/01/2026 – 10/19/2026" (English). Open ends read "ab …" / "bis …" (Deutsch) or "from …" / "until …" (English). The Filter Box shows the dates; the speaker notes also name the Date Rule, e.g. "bis 19.10.2026 (Heute)".
+- **Error Slides for Date Filters** (Q85, Q86): a range that turns out empty at Export (for example "from Start of this month to Yesterday" on the 1st), and a page over Power BI's limits, each get an Error Slide that says why.
 - **Filter Box:** when the Deck's setting **"Show Filters on slides"** is on (off by default, stored in the Saved Selection), every slide whose Entry has Filters gets a Filter Box. Slides without Filters get none.
   - **Content:** a heading ("Filter" / "Filters", in the Render Language), then one line per Filter, such as "Country: Germany, France". The column is shown, not the table. It uses the template's font and text colour, at about 12 pt.
   - **Place:** to the right of the Page Image, 0.3 cm away, top-aligned with it. The right edge keeps the title's left margin from the slide edge, or stays inside the picture placeholder. It never covers the header or footers.

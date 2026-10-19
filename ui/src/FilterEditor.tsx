@@ -1,6 +1,8 @@
 import { FormEvent, useState } from "react";
 import { Refused } from "./api";
-import { describeFilter, Filter, FilterCheckResult } from "./types";
+import { ConditionFields, newDraft, readDraft } from "./ConditionFields";
+import { describeFilter } from "./filters";
+import type { Filter, FilterCheckResult } from "./types";
 
 type Check = { state: "checking" } | { state: "done"; result: FilterCheckResult } | { state: "error"; message: string };
 
@@ -33,16 +35,22 @@ export function FilterEditor({
 
   const [table, setTable] = useState("");
   const [column, setColumn] = useState("");
-  const [values, setValues] = useState("");
+  const [draft, setDraft] = useState(() => newDraft("values", false));
 
-  const parsed = values.split(",").map((v) => v.trim()).filter(Boolean);
-  const complete = table.trim() && column.trim() && parsed.length > 0;
+  const condition = readDraft(draft);
+  const complete = table.trim() && column.trim() && !("problem" in condition);
 
   function add(event: FormEvent) {
     event.preventDefault();
-    if (!complete) return;
-    onChange([...filters, { table: table.trim(), column: column.trim(), values: parsed }]);
-    setValues("");
+    if (!complete || "problem" in condition) return;
+    const field = { table: table.trim(), column: column.trim() };
+    if (condition.kind === "values") {
+      onChange([...filters, { ...field, values: condition.values }]);
+    } else {
+      // A single Entry's form has no "keep as is", so both ends are DateEnds here.
+      onChange([...filters, { ...field, from: condition.from === "keep" ? null : condition.from, to: condition.to === "keep" ? null : condition.to }]);
+    }
+    setDraft({ ...draft, values: "" });
   }
 
   return (
@@ -76,16 +84,17 @@ export function FilterEditor({
           Column
           <input value={column} onChange={(e) => setColumn(e.target.value)} placeholder="Country" />
         </label>
-        <label className="wide">
-          Values, separated by commas
-          <input value={values} onChange={(e) => setValues(e.target.value)} placeholder="Germany, France" />
-        </label>
+        <ConditionFields draft={draft} onChange={setDraft} allowKeep={false} />
         <button type="submit" disabled={!complete}>
           Add Filter
         </button>
       </form>
+      {"problem" in condition && draft.kind === "date" && (draft.from.choice !== "none" || draft.to.choice !== "none") && (
+        <p className="warning small">{condition.problem}</p>
+      )}
       <p className="muted small">
-        Use the table and column names from the report's data. A value made only of digits is treated as a number.
+        Use the table and column names from the report's data. A value made only of digits is treated as a number. A date
+        range needs a real date column, such as Calendar / Date; both ends count in full.
       </p>
     </div>
   );

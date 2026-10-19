@@ -99,7 +99,17 @@ input {
   padding: 0.4rem 0.55rem;
   min-width: 0;
 }
-input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.4rem;
+  min-width: 0;
+}
+input:focus-visible, button:focus-visible, select:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 .paste-form { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
 .paste-form input { flex: 1; }
@@ -177,3 +187,21 @@ progress.bar { width: 100%; height: 0.6rem; accent-color: var(--accent); }
 .left-out { color: var(--attention); margin: 0.25rem 0 0; }
 .left-out p { margin: 0; }
 .left-out ul { margin: 0.2rem 0 0; padding-left: 1.2rem; }
+
+/* --- Date ranges and the Filter Overview ------------------------------------------------ */
+.condition-kind { display: flex; gap: 1rem; margin: 0; flex: 1 1 100%; }
+.filter-form .condition-kind label { flex-direction: row; flex: none; color: var(--text); }
+.end-picker { display: flex; flex-direction: column; gap: 0.3rem; flex: 1 1 11rem; align-self: flex-start; }
+.filter-form .end-picker label { flex: none; }
+.entry-body .warning { margin: 0.35rem 0 0; }
+.overview { margin-top: 1rem; border-top: 1px solid var(--border); padding-top: 0.75rem; }
+.overview summary { cursor: pointer; }
+.field-group { border: 1px solid var(--border); border-radius: 8px; padding: 0.5rem 0.75rem; margin-top: 0.75rem; }
+.field-group.active { border-color: var(--accent); }
+.group-head { display: flex; align-items: baseline; gap: 0.5rem; cursor: pointer; }
+.overview-items { list-style: none; padding: 0; margin: 0.35rem 0 0 1.5rem; }
+.overview-items label { display: flex; align-items: baseline; gap: 0.5rem; cursor: pointer; padding: 0.1rem 0; }
+.overview-items .position { padding-top: 0; min-width: 1.2rem; }
+.overview-actions { align-items: center; margin-top: 0.6rem; }
+.overview-edit { margin-top: 0.75rem; }
+.overview-edit .warning { flex: 1 1 100%; margin: 0; }

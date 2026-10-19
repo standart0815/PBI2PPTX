@@ -49,6 +49,7 @@ class FakeService:
     async def check_filters(self, page_url, filters):
         if self.failure:
             raise self.failure
+        self.checked = list(filters)
         applied = filters[0].table == "financials"
         return FilterVerdict(FilterCheck.APPLIED if applied else FilterCheck.NOT_APPLIED, () if applied else tuple(filters))
 
@@ -274,3 +275,20 @@ def test_add_current_page_can_take_over_the_set_filters(tmp_path):
     assert plain["entry"]["filters"] == [] and plain["leftOut"] == []
     assert with_filters["entry"]["filters"] == [{"table": "financials", "column": "Country", "values": ["Germany"]}]
     assert with_filters["leftOut"] == [{"what": "Slicer Date", "reason": "ranges aren't supported"}]
+
+
+def test_filter_check_works_out_date_rules_and_refuses_empty_ranges(tmp_path):
+    from datetime import date
+
+    from pbi2pptx.page_url import DateFilter
+
+    app, service, _ = make(tmp_path)
+    year_to_date = {"table": "Calendar", "column": "Date", "from": {"rule": "startOfThisYear"}, "to": {"rule": "today"}}
+    empty = {"table": "Calendar", "column": "Date", "from": {"rule": "today"}, "to": {"rule": "yesterday"}}
+    with TestClient(app) as client:
+        checked = client.post("/api/filters/check", headers=AUTH, json={"pageUrl": PAGE, "filter": year_to_date}).json()
+        refused = client.post("/api/filters/check", headers=AUTH, json={"pageUrl": PAGE, "filter": empty})
+    today = date.today()
+    assert service.checked == [DateFilter("Calendar", "Date", date(today.year, 1, 1), today)]
+    assert checked["result"] == "not applied" and "holds dates" in checked["message"]
+    assert refused.status_code == 422 and "empty today" in refused.json()["error"]
