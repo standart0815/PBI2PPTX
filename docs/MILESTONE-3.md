@@ -89,6 +89,12 @@ Each step ends with something runnable and tested.
    - PyInstaller builds for macOS (`.app` in a `.dmg`) and Windows (`.exe` installer), built in CI.
    - First-run experience: browser check, then sign-in.
    - Done when: a clean machine without Python installs and runs it.
+   - Status (2026-10-19): **macOS done locally, Windows prepared.**
+     - `packaging/pbi2pptx.spec` builds both platforms. It bundles the interface and Playwright's driver; the installed Chrome/Edge is used.
+     - The macOS `PBI2PPTX.app` (176 MB; 69 MB `.dmg`) was built and launched: it drove Chrome signed in, logged, and quit cleanly.
+     - Added: one instance at a time, a log file, and a **menu bar / tray icon** with "Open PBI2PPTX" and "Quit". macOS doesn't relaunch a running app, so the icon is the way back to a closed interface tab.
+     - Windows: `packaging/windows/pbi2pptx.iss` (Inno Setup, per user, no admin rights) and `build_windows.ps1`. The *Release build* workflow builds both installers. **Not run yet**: it needs the GitHub repository. Not verified on a clean machine either.
+     - Still open: the update check (Q54) needs the repository URL. The menu bar icon was confirmed by the user on 2026-10-19: it shows, "Open PBI2PPTX" brings the interface back, and "Quit" stops the app.
 8. **Pilot.**
    - You and 2–3 colleagues, at least one on Windows with Edge, and one who reaches a report **only through a Power BI App**.
    - This closes the accepted risks. Collect problems with the Power BI interface and fix them in `power_bi_ui.py`.
