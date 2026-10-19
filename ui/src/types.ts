@@ -22,7 +22,14 @@ export interface Selection {
   name: string;
   renderLanguage: "de-DE" | "en-US";
   slideLayout: string | null;
+  showFilters?: boolean; // a Filter Box on slides whose Entry has Filters (absent in older files)
   entries: Entry[];
+}
+
+/** Something "Add current page" didn't take over, and why. */
+export interface LeftOut {
+  what: string;
+  reason: string;
 }
 
 export type SelectionJson = Omit<Selection, "entries"> & { entries: EntryJson[] };
@@ -33,6 +40,7 @@ export const emptySelection = (): Selection => ({
   name: "Untitled Selection",
   renderLanguage: "de-DE",
   slideLayout: null,
+  showFilters: false,
   entries: [],
 });
 

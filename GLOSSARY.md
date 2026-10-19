@@ -27,6 +27,10 @@ _Avoid_: tab, section, ReportSection
 **Hidden Page**:
 A Report Page that the report author hid from viewers, such as a tooltip or drill-through page. It is never offered for selection.
 
+**Filter Pane**:
+Power BI's own side panel that lists the filters on a report page. The tool reads it to verify Filters and to take over the filters a User set.
+_Avoid_: filter panel, Filter Box
+
 **Default State**:
 A Report Page as published, without any viewer's slicer selections, personal bookmarks or persisted filters.
 _Avoid_: current state, my view
@@ -88,6 +92,10 @@ _Avoid_: job, conversion, download
 **Deck**:
 The PowerPoint file an Export produces, with one slide per Entry.
 _Avoid_: presentation, PowerPoint, report
+
+**Filter Box**:
+The text box on a slide, to the right of the Page Image, that lists the Entry's Filters. It appears only when the Deck shows Filters on slides and the Entry has Filters.
+_Avoid_: legend, filter panel, filter pane
 
 **Error Slide**:
 The slide that takes the place of an Entry whose Report Page could not be captured: for example, the page was deleted, the User has no access, or Power BI did not apply one of its Filters. It names the page and the reason.

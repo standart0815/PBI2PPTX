@@ -21,6 +21,7 @@ from playwright.async_api import BrowserContext, Page, async_playwright
 
 from . import power_bi_ui as ui
 from .page_url import Filter, PageUrl, is_app_link, parse_page_url
+from .set_filters import FilterCard, Slicer, TakeOver, take_over
 
 
 def profile_dir() -> Path:
@@ -330,6 +331,81 @@ class PowerBIWindow:
                 pass
             await self.page.wait_for_timeout(self.settle_ms)
         return FilterVerdict(FilterCheck.NOT_APPLIED if missing else FilterCheck.APPLIED, missing)
+
+    async def read_set_filters(self) -> TakeOver:
+        """For "Add current page": the filters the Filter Pane and the slicers show right now."""
+        cards = []
+        opened = False
+        if not await self.page.locator(ui.FILTER_PANE).count():
+            opened = await self._click(ui.FILTER_PANE_TOGGLE_TEXTS)
+            if opened:
+                try:
+                    await self.page.locator(ui.FILTER_CARD_TITLES).first.wait_for(state="visible", timeout=10_000)
+                except Exception:  # noqa: BLE001 - a pane without cards
+                    pass
+        if await self.page.locator(ui.FILTER_PANE).count():
+            raw = await self.page.evaluate(
+                """([cards, field, restatement]) => [...document.querySelectorAll(cards)].map(card => ({
+                    field: card.querySelector(field)?.getAttribute('title') || '',
+                    condition: card.querySelector(restatement)?.getAttribute('title') || '',
+                }))""",
+                [ui.FILTER_CARD_TITLES, ui.FILTER_CARD_FIELD, ui.FILTER_CARD_RESTATEMENT],
+            )
+            for index, item in enumerate(raw):
+                ticked = ()
+                if re.search(ui.ABBREVIATED, item["condition"]):
+                    ticked = await self._ticked_values_of_card(index)
+                cards.append(FilterCard(item["field"], item["condition"], ticked))
+        if opened:
+            await self._click(ui.FILTER_PANE_TOGGLE_TEXTS)  # close it again: the open pane narrows the canvas
+            await self.page.wait_for_timeout(self.settle_ms)
+
+        raw_slicers = await self.page.evaluate(
+            """([slicer, header, item, dropdown, range, selectAll]) => [...document.querySelectorAll('.visualContainer')]
+                .filter(v => v.matches(slicer))
+                .map(v => {
+                    const items = [...v.querySelectorAll(item)];
+                    const all = items.find(i => selectAll.includes((i.getAttribute('title') || '').trim()));
+                    const values = items.filter(i => i !== all && i.getAttribute('aria-checked') === 'true')
+                        .map(i => (i.getAttribute('title') || i.innerText).trim());
+                    let scrollable = false;
+                    for (let e = items[0]?.parentElement; e && e !== v; e = e.parentElement)
+                        if (e.scrollHeight > e.clientHeight + 2) { scrollable = true; break; }
+                    const drop = v.querySelector(dropdown);
+                    return {
+                        column: (v.querySelector(header)?.innerText || '').trim(),
+                        kind: v.querySelector(range) ? 'range' : drop ? 'dropdown' : 'list',
+                        ticked: values,
+                        selectAll: all ? all.getAttribute('aria-checked') || '' : '',
+                        dropdownText: drop ? drop.innerText.trim() : '',
+                        scrollable,
+                    };
+                })""",
+            [ui.SLICER, ui.SLICER_HEADER, ui.SLICER_ITEM, ui.SLICER_DROPDOWN, ui.SLICER_RANGE, list(ui.SELECT_ALL)],
+        )
+        slicers = [
+            Slicer(s["column"], s["kind"], tuple(s["ticked"]), s["selectAll"], s["dropdownText"], s["scrollable"])
+            for s in raw_slicers
+            if s["column"]
+        ]
+        return take_over(cards, slicers)
+
+    async def _ticked_values_of_card(self, index: int) -> tuple:
+        """Open a card whose condition Power BI shortened and read every ticked value (best effort)."""
+        card = self.page.locator(ui.FILTER_CARD_TITLES).nth(index)
+        try:
+            await card.click()
+            await self.page.wait_for_timeout(1000)
+            container = card.locator("xpath=..")
+            values = await container.locator(ui.FILTER_CARD_CHECKED).evaluate_all(
+                "(els, selectAll) => els.map(e => (e.getAttribute('title') || e.innerText || '').trim())"
+                ".filter(v => v && !selectAll.includes(v))",
+                list(ui.SELECT_ALL),
+            )
+            await card.click()  # fold it again
+            return tuple(values)
+        except Exception:  # noqa: BLE001 - not readable: the Filter is left out, never taken over incomplete
+            return ()
 
     async def _open(self, url: str) -> None:
         await self.page.goto(url)

@@ -171,3 +171,9 @@ progress.bar { width: 100%; height: 0.6rem; accent-color: var(--accent); }
 .export-entry.error-slide .mark, .export-entry.error-slide .entry-message { color: var(--problem); }
 .entry-message { margin: 0.1rem 0 0; }
 .result p { margin: 0.5rem 0; }
+
+/* --- Filters taken over ----------------------------------------------------------------- */
+.toggle { display: inline-flex; align-items: center; gap: 0.35rem; cursor: pointer; }
+.left-out { color: var(--attention); margin: 0.25rem 0 0; }
+.left-out p { margin: 0; }
+.left-out ul { margin: 0.2rem 0 0; padding-left: 1.2rem; }

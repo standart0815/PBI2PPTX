@@ -95,6 +95,7 @@ Each step ends with something runnable and tested.
      - Added: one instance at a time, a log file, and a **menu bar / tray icon** with "Open PBI2PPTX" and "Quit". macOS doesn't relaunch a running app, so the icon is the way back to a closed interface tab.
      - Windows: `packaging/windows/pbi2pptx.iss` (Inno Setup, per user, no admin rights) and `build_windows.ps1`. The *Release build* workflow builds both installers. **Not run yet**: it needs the GitHub repository. Not verified on a clean machine either.
      - Still open: the update check (Q54) needs the repository URL. The menu bar icon was confirmed by the user on 2026-10-19: it shows, "Open PBI2PPTX" brings the interface back, and "Quit" stops the app.
+   - **Added after step 7 (2026-10-19), decisions Q60–Q74:** "Add current page" can take over the filters set in the Filter Pane and slicers, and Decks can show a Filter Box. Checked live against the Workspace report: Country and Discount Band were taken over, the date slider was left out with its reason, and the Filter Box was placed right of the page in Firmenvorlage. One part is unverified: reading a shortened Filter Pane list, which has not been seen in a real report yet (`power_bi_ui.FILTER_CARD_CHECKED`).
 8. **Pilot.**
    - You and 2–3 colleagues, at least one on Windows with Edge, and one who reaches a report **only through a Power BI App**.
    - This closes the accepted risks. Collect problems with the Power BI interface and fix them in `power_bi_ui.py`.

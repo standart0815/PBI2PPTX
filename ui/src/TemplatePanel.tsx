@@ -125,6 +125,19 @@ export function TemplatePanel({
       )}
 
       <fieldset className="languages">
+        <legend>Filters on slides</legend>
+        <label className="language-option">
+          <input
+            type="checkbox"
+            checked={selection.showFilters ?? false}
+            onChange={(e) => setSelection((s) => ({ ...s, showFilters: e.target.checked }))}
+          />
+          Show Filters on slides
+          <span className="muted small">a box to the right of each page that has Filters</span>
+        </label>
+      </fieldset>
+
+      <fieldset className="languages">
         <legend>Render language: numbers and dates in the pages</legend>
         {LANGUAGES.map((l) => (
           <label key={l.value} className="language-option">

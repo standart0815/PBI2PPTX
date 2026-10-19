@@ -5,6 +5,7 @@ Rules (docs/DESIGN.md, "Slide composition"):
 - Of the layout's placeholders only the title and the footers stay on a slide.
 - The Page Image is as large as possible inside the Image Area, anchored top-left.
 - A page that could not be captured becomes an Error Slide; the Export carries on.
+- With "Show Filters on slides", a Filter Box lists the Entry's Filters to the right of the page.
 """
 
 from __future__ import annotations
@@ -16,11 +17,14 @@ from pathlib import Path
 from typing import List, Optional, Sequence
 
 from PIL import Image
-from pptx.util import Pt
+from pptx.enum.shapes import PP_PLACEHOLDER
+from pptx.enum.text import MSO_ANCHOR
+from pptx.util import Cm, Pt
 
 from .template import (
     FOOTER_TYPES,
     TITLE_TYPES,
+    Box,
     fit_top_left,
     image_area,
     layout_by_name,
@@ -40,6 +44,7 @@ LABELS = {
         "error": "Diese Seite konnte nicht erfasst werden.",
         "reason": "Grund",
         "filter_check": "Filter-Prüfung",
+        "filter_box": "Filter",
     },
     "en": {
         "report": "Report",
@@ -51,6 +56,7 @@ LABELS = {
         "error": "This page could not be captured.",
         "reason": "Reason",
         "filter_check": "Filter check",
+        "filter_box": "Filters",
     },
 }
 
@@ -66,6 +72,48 @@ class CapturedEntry:
     filters: Sequence[str] = field(default_factory=tuple)
     error: str = ""
     filter_note: str = ""  # e.g. "not possible: the report hides its filter pane"
+    filter_box: Sequence[str] = field(default_factory=tuple)  # lines for the Filter Box, e.g. "Country: Germany, France"
+
+
+FILTER_BOX_GAP = Cm(0.3)
+FILTER_BOX_SHARE = 0.20  # the Filter Box needs at least this share of the Image Area's width
+FILTER_BOX_PT = 12
+
+
+def filter_box_right_edge(layout, area: Box, slide_width: int) -> int:
+    """Inside a picture placeholder its edge; otherwise the title's left margin, mirrored on the right."""
+    if any(placeholder_type(ph) == PP_PLACEHOLDER.PICTURE for ph in layout.placeholders):
+        return area.right
+    titles = [ph for ph in layout.placeholders if placeholder_type(ph) in TITLE_TYPES]
+    margin = int(titles[0].left) if titles and int(titles[0].left) < slide_width // 2 else 0
+    return min(area.right, slide_width - margin)
+
+
+def place_with_filter_box(area: Box, image_width: int, image_height: int, right_edge: int) -> tuple:
+    """The Page Image and the Filter Box: the box goes where the page leaves room on the right, and
+    the page is made just narrow enough when that room is less than the box needs."""
+    need = FILTER_BOX_GAP + int(area.width * FILTER_BOX_SHARE)
+    image = fit_top_left(area, image_width, image_height)
+    if right_edge - image.right < need:
+        narrowed = Box(area.left, area.top, right_edge - need - area.left, area.height)
+        image = fit_top_left(narrowed, image_width, image_height)
+    left = image.right + FILTER_BOX_GAP
+    return image, Box(left, image.top, right_edge - left, area.bottom - image.top)
+
+
+def _add_filter_box(slide, box: Box, heading: str, lines: Sequence[str]) -> None:
+    shape = slide.shapes.add_textbox(box.left, box.top, box.width, box.height)
+    shape.name = "Filter Box"
+    text = shape.text_frame
+    text.word_wrap = True
+    text.vertical_anchor = MSO_ANCHOR.TOP
+    text.text = heading
+    text.paragraphs[0].runs[0].font.bold = True
+    text.paragraphs[0].runs[0].font.size = Pt(FILTER_BOX_PT)
+    for line in lines:  # the template's font and text colour, by not setting them
+        paragraph = text.add_paragraph()
+        paragraph.text = line
+        paragraph.runs[0].font.size = Pt(FILTER_BOX_PT)
 
 
 def _drop_template_slides(prs) -> None:
@@ -131,9 +179,15 @@ def build_deck(
         if entry.image is not None:
             with Image.open(entry.image) as img:
                 width, height = img.size
-            box = fit_top_left(area, width, height)
+            if entry.filter_box:
+                right_edge = filter_box_right_edge(layout, area, int(prs.slide_width))
+                box, filter_box = place_with_filter_box(area, width, height, right_edge)
+            else:
+                box, filter_box = fit_top_left(area, width, height), None
             pic = slide.shapes.add_picture(str(entry.image), box.left, box.top, box.width, box.height)
             pic._element.nvPicPr.cNvPr.set("descr", entry.title)
+            if filter_box is not None:
+                _add_filter_box(slide, filter_box, labels["filter_box"], entry.filter_box)
         else:
             text = slide.shapes.add_textbox(area.left, area.top, area.width, area.height).text_frame
             text.word_wrap = True

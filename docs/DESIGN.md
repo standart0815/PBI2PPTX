@@ -13,14 +13,23 @@ Terms are defined in [GLOSSARY.md](../GLOSSARY.md). The decisions behind the des
    - The profile keeps the session between runs. **"Sign out"** deletes the profile.
 2. **Building a Selection**
    - The User browses Power BI as usual in the Power BI Window: Workspaces, My workspace and Power BI Apps.
-   - **"Add current page"** adds the page currently showing as an Entry. A Page URL can also be pasted. A shared App link (`/Redirect?action=OpenApp…`) is opened in the Power BI Window and resolved to the page it lands on.
+   - **"Add current page"** adds the page currently showing as an Entry. With the checkbox **"Include the filters I set"** (on by default, remembered by the interface), the Entry also takes over the page's current filters:
+     - **What's taken over:** what the Filter Pane and the page's slicers show, as far as it can be written as "column = values". That includes author defaults, which is harmless because the page looks the same.
+     - **What's skipped:** filters and slicers showing "Alle"/"All".
+     - **What's left out:** ranges (such as a date slider), Top N, relative dates and click highlights. The interface's notice lists them with the reason. Nothing about them appears on the slide.
+     - **Table and column:** each Filter Pane card carries its full field name in a hidden label, such as `"financials"[Country]` (checked 2026-10-19). Slicers show only the column's display name. They take their table from a Filter Pane card with the same column. Without such a card, the slicer is left out with the note "table unknown: add this Filter by hand".
+     - **Also left out, with a note:**
+       - filters other than a plain "is one of": "ist nicht" (is not), contains, greater than, Top N, relative dates
+       - values that look like numbers or dates: Power BI shows them formatted for the language, and a wrong guess would give silently empty visuals
+       - lists the tool can't read completely: if Power BI shortens a long list, the tool opens the card and reads the ticked values. A Filter is never taken over incomplete.
+     - **A visible side effect:** a slicer taken over as a Filter is applied through the page address. On the slide, the slicer itself may still show "Alle", while the data is filtered. The Filter Box shows what applies. A Page URL can also be pasted. A shared App link (`/Redirect?action=OpenApp…`) is opened in the Power BI Window and resolved to the page it lands on.
    - Each Entry holds a Page URL, a slide title (the page name by default, editable) and its Filters.
    - Filters are entered in a small form (table, column, values). The tool turns them into Power BI's URL filter syntax, for example `?filter=Table/Column in ('A','B')`. An "apply to all Entries" button covers the "same pack for each region or month" case.
    - Each Filter has an optional **"Check"** button. It opens the page with that Filter in the Power BI Window and reports whether Power BI applied it (see Filter verification).
    - Entries can be reordered by drag and drop, can repeat the same page, and can mix Reports from different Workspaces and Power BI Apps.
 3. **Saved Selection**
    - The Selection has a name and is saved as `<name>.json` wherever the User chooses.
-   - The file holds the Page URLs, a snapshot of their names, slide titles, Filters, the Slide Layout name and the Render Language. It does not contain the Template.
+   - The file holds the Page URLs, a snapshot of their names, slide titles, Filters, the Slide Layout name, the Render Language and the "Show Filters on slides" setting. It does not contain the Template.
    - A colleague can open someone else's file.
 4. **Export**
    - The User picks the Template (.potx), a Slide Layout (see [Slide composition](#slide-composition) for which one is preselected) and the Render Language (German by default, English possible).
@@ -57,6 +66,10 @@ Terms are defined in [GLOSSARY.md](../GLOSSARY.md). The decisions behind the des
   - It fills the full width whenever the height allows.
   - Example: a 16:9 page on a 33.9 × 19.1 cm slide whose header ends at 3 cm becomes 28.5 × 16.1 cm, with 5.3 cm left empty on the right.
 - Pages with unusual sizes, such as tall scrolling pages, are fitted whole.
+- **Filter Box:** when the Deck's setting **"Show Filters on slides"** is on (off by default, stored in the Saved Selection), every slide whose Entry has Filters gets a Filter Box. Slides without Filters get none.
+  - **Content:** a heading ("Filter" / "Filters", in the Render Language), then one line per Filter, such as "Country: Germany, France". The column is shown, not the table. It uses the template's font and text colour, at about 12 pt.
+  - **Place:** to the right of the Page Image, 0.3 cm away, top-aligned with it. The right edge keeps the title's left margin from the slide edge, or stays inside the picture placeholder. It never covers the header or footers.
+  - **Room:** the box needs at least 20 % of the Image Area's width. If the page leaves that much free on the right, it keeps its size. Otherwise the page is made just narrow enough.
 - **Speaker notes** record the Report and Report Page names, a link back to the page in Power BI, the Filters applied and the Export timestamp.
 - A Report Page that fails to render becomes an **Error Slide** that names the page and the reason. The Export carries on.
 - Speaker-note labels and Error Slide texts follow the Render Language. The interface itself is English.

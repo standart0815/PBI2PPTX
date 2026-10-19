@@ -238,3 +238,55 @@ def test_check_button_verifies_without_capturing(tmp_path):
     ok, typo = run(check())
     assert ok.check is FilterCheck.APPLIED
     assert typo.check is FilterCheck.NOT_APPLIED and typo.missing == (Filter.parse("financial/Country=Germany"),)
+
+
+def test_reads_the_filters_a_user_set(tmp_path):
+    import json
+
+    pane = [{"table": "financials", "column": "Country", "condition": "ist Germany oder France"}]
+    slicers = [
+        {"column": "Discount Band", "kind": "list", "selectAll": "mixed", "items": [["High", False], ["Low", True], ["Medium", True]]},
+        {"column": "Product", "kind": "dropdown", "text": "Alle"},
+        {"column": "Date", "kind": "range"},
+        {"column": "Region", "kind": "list", "selectAll": "mixed", "items": [["EMEA", True], ["APAC", False]]},
+    ]
+
+    async def check():
+        async with fake_window(tmp_path) as w:
+            await w.open_home()
+            await w.page.evaluate(
+                "([p, s]) => { localStorage.setItem('fake-pane-filters', p); localStorage.setItem('fake-slicers', s); }",
+                [json.dumps(pane), json.dumps(slicers)],
+            )
+            await w.page.goto(parse_page_url(WS_PAGE).with_filters([Filter.parse("financials/Segment=Government")]))
+            await w._wait_until_rendered()
+            result = await w.read_set_filters()
+            return result, await w.page.locator("filter-pane-modern").count()
+
+    result, pane_left_open = run(check())
+    assert result.filters == [
+        Filter("financials", "Segment", ("Government",)),  # the page address's own Filter shows as a card too
+        Filter("financials", "Country", ("Germany", "France")),
+        Filter("financials", "Discount Band", ("Low", "Medium")),  # table from the "Discount Band" card
+    ]
+    assert {lo.what: lo.reason for lo in result.left_out} == {
+        "Slicer Date": "ranges aren't supported",
+        "Slicer Region = EMEA": "table unknown: add this Filter by hand",
+    }
+    assert pane_left_open == 0
+
+
+def test_a_shortened_card_is_opened_and_read(tmp_path):
+    import json
+
+    pane = [{"table": "financials", "column": "Country", "condition": "ist Germany, France und 1 weitere", "ticked": ["Germany", "France", "Mexico"]}]
+
+    async def check():
+        async with fake_window(tmp_path) as w:
+            await w.open_home()
+            await w.page.evaluate("p => localStorage.setItem('fake-pane-filters', p)", json.dumps(pane))
+            await w.page.goto(WS_PAGE)
+            await w._wait_until_rendered()
+            return await w.read_set_filters()
+
+    assert run(check()).filters == [Filter("financials", "Country", ("Germany", "France", "Mexico"))]

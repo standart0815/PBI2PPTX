@@ -138,8 +138,14 @@ def create_app(
         return Entry(current.page_url.url, current.page_name, current.report_name, current.page_name).to_json()
 
     async def add_current_page(request: Request) -> Response:
+        include_filters = (await json_body(request)).get("includeFilters") is True
         try:
-            return JSONResponse({"entry": proposed_entry(await service.current_page())})
+            current, taken = await service.current_page(include_filters)
+            entry = proposed_entry(current)
+            if taken is not None:
+                entry["filters"] = [f.to_json() for f in taken.filters]
+            left_out = [{"what": lo.what, "reason": lo.reason} for lo in (taken.left_out if taken else [])]
+            return JSONResponse({"entry": entry, "leftOut": left_out})
         except (WindowNotOpen, Busy) as e:
             return problem(409, str(e))
         except NotAReportPage:

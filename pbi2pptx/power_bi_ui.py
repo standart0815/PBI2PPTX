@@ -48,6 +48,27 @@ FILTER_PANE_TOGGLE_TEXTS = ("Filterbereich anzeigen/ausblenden", "Show/hide filt
 # Card titles read "<Column> ist <Value> oder <Value>" ("<Column> is <Value> or <Value>").
 FILTER_CARD_TITLES = "filter-pane-modern div.filterCardTitleSection"
 FILTER_CARD_VALUE_SEPARATORS = r" oder | or |, "
+# Inside a card: the full field name as `"table"[column]` (title attribute), and the condition (title attribute).
+FILTER_CARD_FIELD = "[data-testid=filter-card-title]"
+FILTER_CARD_RESTATEMENT = "[data-testid=filter-card-restatement]"
+
+# Taking over the filters a User set (DESIGN.md, Building a Selection). Checked 2026-10-19.
+CONDITION_IS = ("ist ", "is ")
+CONDITION_IS_NOT = ("ist nicht ", "is not ")
+ALL_VALUES = ("(alle)", "(All)", "Alle", "All")
+SELECT_ALL = ("Alle auswählen", "Select all")
+MULTIPLE_SELECTIONS = ("Mehrere Auswahlen", "Multiple selections")
+# Power BI shortens long value lists ("… und 3 weitere"); not yet seen live, so matched loosely.
+ABBREVIATED = r"\d+ (weitere|more)|…"
+# Ticked values inside an expanded filter card. Not yet verified live.
+FILTER_CARD_CHECKED = "[aria-checked=true]"
+
+# Slicers on the page.
+SLICER = ".visualContainer:has(.visual-slicer)"
+SLICER_HEADER = "div.slicer-header-wrapper"
+SLICER_ITEM = "div.slicerItemContainer"  # aria-checked = true / false / mixed, value in title
+SLICER_DROPDOWN = "[data-testid=slicer-dropdown]"
+SLICER_RANGE = "[data-handle]"  # the handles of a range slider (dates, numbers)
 
 # Tips and promotions laid over the canvas.
 OVERLAYS = (".tutorial-popup", ".ms-TeachingBubble", "[role=dialog]", "[role=alertdialog]")

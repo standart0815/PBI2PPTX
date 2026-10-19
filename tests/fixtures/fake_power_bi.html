@@ -8,6 +8,8 @@
     fake-changed      "1": the User has personal changes, so "Reset to default" is enabled
     fake-actual-size  "1": the canvas is not in fit-to-page view
     fake-no-pane      "1": the report hides its filter pane (no toggle button)
+    fake-pane-filters JSON [{table, column, condition, ticked?}]: filters the User set in the Filter Pane
+    fake-slicers      JSON [{column, kind: list|dropdown|range, items?: [[value, checked]], selectAll?, text?, scrollable?}]
 
   URL filters (?filter=…) apply only to known fields (financials/Country, financials/Segment);
   others are silently ignored, as in Power BI. Applied ones show as filter pane cards.
@@ -44,6 +46,7 @@ const PAGES = [
 const path = location.pathname;
 const query = new URLSearchParams(location.search);
 const store = { get: k => localStorage.getItem(k) === "1", set: (k, v) => v ? localStorage.setItem(k, "1") : localStorage.removeItem(k) };
+const json = (k) => { try { return JSON.parse(localStorage.getItem(k) || "[]"); } catch { return []; } };
 
 function el(tag, attrs = {}, text = "") {
   const e = document.createElement(tag);
@@ -70,18 +73,60 @@ function parseFilters(expression) {
 const appliedFilters = parseFilters(query.get("filter")).filter((f) => (KNOWN_FIELDS[f.table] || []).includes(f.column));
 let paneOpen = false;
 
+// A Filter Pane card: the field label `"table"[column]` and the condition, both in title attributes.
+function card(table, column, condition, ticked) {
+  const box = el("div", { class: "filterCard" });
+  const title = el("div", { class: "filterCardTitleSection" });
+  title.append(el("span", { "data-testid": "filter-card-title", title: `"${table}"[${column}]` }, column), " ",
+               el("span", { "data-testid": "filter-card-restatement", title: condition }, condition));
+  box.append(title);
+  if (ticked) {  // a shortened condition: clicking the card shows every ticked value
+    title.onclick = () => {
+      const open = box.querySelector(".items");
+      if (open) { open.remove(); return; }
+      const items = el("div", { class: "items" });
+      items.append(el("div", { "aria-checked": "mixed", title: "Alle auswählen" }, "Alle auswählen"));
+      for (const v of ticked) items.append(el("div", { "aria-checked": "true", title: v }, v));
+      items.append(el("div", { "aria-checked": "false", title: "Canada" }, "Canada"));
+      box.append(items);
+    };
+  }
+  return box;
+}
+
 function toggleFilterPane() {
   paneOpen = !paneOpen;
   const old = document.querySelector("filter-pane-modern");
   if (old) old.remove();
   if (paneOpen) {
     const pane = el("filter-pane-modern");
-    pane.append(el("div", { class: "filterCardTitleSection" }, "Product ist (alle)"));
-    for (const f of appliedFilters) pane.append(el("div", { class: "filterCardTitleSection" }, `${f.column} ist ${f.values.join(" oder ")}`));
+    pane.append(card("financials", "Product", "ist (alle)"), card("financials", "Discount Band", "ist (alle)"));
+    for (const f of appliedFilters) pane.append(card(f.table, f.column, `ist ${f.values.join(" oder ")}`));
+    for (const f of json("fake-pane-filters")) pane.append(card(f.table, f.column, f.condition, f.ticked));
     document.body.append(pane);
   }
   const canvas = document.querySelector(".displayArea");
   if (canvas) canvas.style.width = paneOpen ? "1000px" : "1280px";  // the open pane narrows the canvas
+}
+
+// A slicer visual: a header, then ticked list items, a dropdown, or the two handles of a range.
+function slicer(s) {
+  const container = el("div", { class: "visualContainer" });
+  const visual = el("div", { class: "visual visual-slicer" });
+  visual.append(el("div", { class: "slicer-header-wrapper" }, s.column));
+  if (s.kind === "range") {
+    visual.append(el("div", { "data-handle": "0" }), el("div", { "data-handle": "1" }));
+  } else if (s.kind === "dropdown") {
+    visual.append(el("div", { "data-testid": "slicer-dropdown" }, s.text || "Alle"));
+  } else {
+    const list = el("div", { class: "visibleGroup" });
+    if (s.scrollable) { list.style.height = "20px"; list.style.overflow = "auto"; }
+    if (s.selectAll) list.append(el("div", { class: "slicerItemContainer", "aria-checked": s.selectAll, title: "Alle auswählen" }, "Alle auswählen"));
+    for (const [value, checked] of s.items || []) list.append(el("div", { class: "slicerItemContainer", "aria-checked": String(checked), title: value }, value));
+    visual.append(list);
+  }
+  container.append(visual);
+  return container;
 }
 
 function renderCanvas(page) {
@@ -95,6 +140,7 @@ function renderCanvas(page) {
   canvas.append(bar);
   if (appliedFilters.length) canvas.append(el("p", { class: "filter" }, "Filter: " + appliedFilters.map((f) => f.values.join("/")).join(", ")));
   if (store.get("fake-changed")) canvas.append(el("div", { class: "personal" }));
+  for (const s of json("fake-slicers")) canvas.append(slicer(s));
   canvas.append(el("div", { class: "optionsMenu" }));  // a visual's hover toolbar
   document.body.append(canvas);
 }

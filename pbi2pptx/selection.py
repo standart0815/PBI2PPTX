@@ -11,6 +11,7 @@ File format (schemaVersion 1):
       "name": "Monthly pack EMEA",
       "renderLanguage": "de-DE",
       "slideLayout": null,
+      "showFilters": false,            # a Filter Box on slides whose Entry has Filters
       "entries": [
         {
           "pageUrl": "https://app.powerbi.com/groups/…/reports/…/…",
@@ -87,6 +88,7 @@ class Selection:
     entries: list = field(default_factory=list)  # [Entry]
     render_language: str = "de-DE"
     slide_layout: str | None = None
+    show_filters: bool = False
 
     def to_json(self) -> dict:
         return {
@@ -95,6 +97,7 @@ class Selection:
             "name": self.name,
             "renderLanguage": self.render_language,
             "slideLayout": self.slide_layout,
+            "showFilters": self.show_filters,
             "entries": [e.to_json() for e in self.entries],
         }
 
@@ -118,6 +121,7 @@ class Selection:
             entries=[Entry.from_json(e, i) for i, e in enumerate(entries, 1)],
             render_language=language if language in RENDER_LANGUAGES else "de-DE",
             slide_layout=(str(data["slideLayout"]).strip() or None) if data.get("slideLayout") else None,
+            show_filters=data.get("showFilters") is True,
         )
 
     # --- The file ----------------------------------------------------------------------------

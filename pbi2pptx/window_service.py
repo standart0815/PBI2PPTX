@@ -14,6 +14,7 @@ from typing import AsyncIterator, Callable, Sequence
 
 from .page_url import Filter, PageUrl
 from .power_bi_window import CurrentPage, FilterVerdict, PowerBIWindow, sign_out
+from .set_filters import TakeOver
 
 
 class WindowNotOpen(RuntimeError):
@@ -87,10 +88,12 @@ class WindowService:
     def busy(self) -> bool:
         return self._lock.locked()
 
-    async def current_page(self) -> CurrentPage:
-        """The page showing in the Power BI Window, for "Add current page"."""
+    async def current_page(self, include_filters: bool = False) -> tuple[CurrentPage, TakeOver | None]:
+        """The page showing in the Power BI Window, for "Add current page", with the filters the User set."""
         async with self._quick_lock():
-            return await self._open_window().current_page()
+            window = self._open_window()
+            current = await window.current_page()
+            return current, (await window.read_set_filters() if include_filters else None)
 
     async def resolve(self, address: str) -> CurrentPage:
         """Open a pasted Page URL or App link in the Power BI Window and read the page it lands on."""

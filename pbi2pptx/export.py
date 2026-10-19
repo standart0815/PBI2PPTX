@@ -149,7 +149,10 @@ class Exporter:
                             return
                         progress.phase = f"Capturing {index + 1} of {len(progress.entries)}: {entry.slide_title}"
                         item.state = EntryState.CAPTURING
-                        captured.append(await self._capture(window, entry, item, Path(folder) / f"{index:02d}.png", reasons))
+                        result = await self._capture(window, entry, item, Path(folder) / f"{index:02d}.png", reasons)
+                        if selection.show_filters:
+                            result.filter_box = [f"{f.column}: {', '.join(f.values)}" for f in entry.filters]
+                        captured.append(result)
                     if self._cancel:
                         progress.state, progress.phase = ExportState.CANCELLED, ""
                         return

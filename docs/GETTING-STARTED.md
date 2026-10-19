@@ -66,6 +66,10 @@ A Selection is the ordered list of pages that will become your Deck, one slide p
 ### Adding pages
 
 - **Add current page:** open a report page in the Power BI Window, from a Workspace, My workspace or a Power BI App, then click **Add current page**. PBI2PPTX takes the page that is showing.
+  - With **Include the filters I set** ticked (the default, and remembered), the Entry also takes over what you set on the page: filters in Power BI's **Filter Pane** and selections in its **slicers**, such as "Discount Band: Low, Medium". They become ordinary Filters that you can edit or check.
+  - Only "column is one of these text values" can be taken over. Everything else is listed under **Not taken over**, with the reason: date or number ranges (such as a date slider), "is not", contains, greater than, Top N, relative dates, number or date values, and slicers whose table PBI2PPTX can't find. Add those by hand in the Filter form if you need them.
+  - Whatever shows "Alle"/"All" isn't a filter and is skipped.
+  - On the slide, a slicer may still show its full list even though the data is filtered. Turn on **Show Filters on slides** to make clear what applies.
 - **Paste address:** click **Paste address** and paste either a page's address from the browser's address bar, or a **shared App link** (`…/Redirect?action=OpenApp…`). PBI2PPTX opens it in the Power BI Window and adds the page it lands on.
 
 Each Entry shows its page, its report, and how you reach it (Workspace, My workspace or Power BI App).
@@ -127,6 +131,16 @@ Every page slide uses the same layout from the Template. PBI2PPTX recommends one
 - **⚠ "A graphic reaches into the picture area"** means the layout has a picture or shape, such as an illustration, where your pages would go. Pages may collide with it. The sketch shows it in red.
 - **The sketch** shows the chosen layout: title and footers in grey, the picture area dashed. Pages go into the picture area as large as possible, anchored top left, and never cover the title or footers.
 - If a Saved Selection asks for a layout this Template doesn't have, PBI2PPTX uses the recommended one and says so.
+
+### Filters on slides
+
+**Show Filters on slides** adds a **Filter Box** to every slide whose Entry has Filters. It lists them under the heading "Filter" ("Filters" in English), one line each, such as "Country: Germany, France". The box sits to the right of the page, top-aligned, in the template's font and colour.
+
+- If the page leaves enough room on the right (at least a fifth of the picture area), the page keeps its size.
+- Otherwise the page is made just narrow enough.
+- Slides without Filters look as before.
+
+The setting is stored in the Saved Selection, and it's off by default.
 
 ### Render Language
 

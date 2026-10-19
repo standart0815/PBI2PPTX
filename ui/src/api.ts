@@ -1,7 +1,7 @@
 // Talks to the local server (pbi2pptx/server.py). The per-launch token comes from the
 // address the tool opened, and goes with every API call.
 
-import type { EntryJson, ExportProgress, Filter, FilterCheckResult, SelectionJson, TemplateInfo } from "./types";
+import type { EntryJson, ExportProgress, Filter, FilterCheckResult, LeftOut, SelectionJson, TemplateInfo } from "./types";
 
 const token = new URLSearchParams(window.location.search).get("token") ?? "";
 
@@ -68,7 +68,8 @@ export const api = {
   showWindow: () => call("/api/window/show", "POST"),
   signOut: () => call("/api/sign-out", "POST"),
   quit: () => call("/api/quit", "POST"),
-  addCurrentPage: () => call<{ entry: EntryJson }>("/api/entries/current", "POST"),
+  addCurrentPage: (includeFilters: boolean) =>
+    call<{ entry: EntryJson; leftOut: LeftOut[] }>("/api/entries/current", "POST", { includeFilters }),
   addByAddress: (address: string) => call<{ entry: EntryJson }>("/api/entries/resolve", "POST", { address }),
   openSelection: (content: string) => call<{ selection: SelectionJson }>("/api/selection/open", "POST", { content }),
   getTemplate: () => call<{ template: TemplateInfo | null }>("/api/template"),

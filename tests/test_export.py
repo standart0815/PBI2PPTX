@@ -136,3 +136,12 @@ def test_refuses_to_start_without_what_it_needs(tmp_path, sample_template):
 
     progress = asyncio.run(go())
     assert progress.state is ExportState.FAILED and "isn't open" in progress.error
+
+
+def test_show_filters_puts_a_filter_box_on_filtered_slides(tmp_path, sample_template):
+    selection = Selection("Pack", [entry(WS_PAGE, "DE", GERMANY), entry(WS_PAGE, "All")], show_filters=True)
+    exporter, _ = asyncio.run(run_export(tmp_path, selection, sample_template.read_bytes()))
+    with_filters, without = slides(exporter.deck()[1])
+    (filter_box,) = [s for s in with_filters.shapes if s.name == "Filter Box"]
+    assert filter_box.text_frame.text.splitlines() == ["Filter", "Country: Germany"]
+    assert all(s.name != "Filter Box" for s in without.shapes)

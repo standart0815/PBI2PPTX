@@ -18,7 +18,7 @@ def selection(**overrides) -> Selection:
 
 
 def test_saved_selection_round_trips():
-    original = selection(render_language="en-US", slide_layout="Tabelle")
+    original = selection(render_language="en-US", slide_layout="Tabelle", show_filters=True)
     reopened = Selection.loads(original.dumps())
     assert reopened == original
     assert reopened.entries[1].page_url.endswith("?ctid=t-1")  # the tenant survives
@@ -79,3 +79,9 @@ def test_unknown_render_language_falls_back_to_german():
     data = selection().to_json()
     data["renderLanguage"] = "fr-FR"
     assert Selection.from_json(data).render_language == "de-DE"
+
+
+def test_older_files_without_the_filter_setting_show_no_filters():
+    data = selection().to_json()
+    del data["showFilters"]
+    assert Selection.from_json(data).show_filters is False

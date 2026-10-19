@@ -64,3 +64,67 @@ def test_notes_trace_each_slide_back_in_the_render_language(sample_template, sam
     notes = Presentation(deck).slides[0].notes_slide.notes_text_frame.text
     assert label in notes
     assert URL in notes and "financials/Country = Germany" in notes
+
+
+# --- Filter Box -------------------------------------------------------------------------------
+
+from pptx.util import Cm  # noqa: E402
+
+from pbi2pptx.deck import FILTER_BOX_GAP, FILTER_BOX_SHARE, place_with_filter_box  # noqa: E402
+from tests.fixtures.samples import FOOTER_TOP, MARGIN  # noqa: E402
+
+LINES = ("Country: Germany, France", "Segment: Government")
+
+
+def _boxes(slide):
+    picture = next(Box.of(s) for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.PICTURE)
+    filter_box = next((s for s in slide.shapes if s.name == "Filter Box"), None)
+    return picture, filter_box
+
+
+def test_filter_box_uses_the_room_the_page_leaves():
+    area = Box(0, 0, int(Cm(33.9)), int(Cm(13.5)))  # "Tabelle" in Firmenvorlage
+    right = int(Cm(33.9 - 2.5))
+    image, box = place_with_filter_box(area, 2560, 1440, right)
+    assert image == Box(0, 0, int(Cm(13.5) * 2560 / 1440), int(Cm(13.5)))  # the page keeps its full size
+    assert box.left == image.right + FILTER_BOX_GAP and box.right == right
+    assert box.width >= area.width * FILTER_BOX_SHARE
+
+
+def test_page_is_narrowed_when_the_room_is_too_small():
+    area = Box(0, 0, int(Cm(33.9)), int(Cm(13.5)))
+    right = int(Cm(31.4))
+    image, box = place_with_filter_box(area, 3840, 1080, right)  # a wide page would fill the width
+    assert box.right == right
+    assert box.width == pytest.approx(area.width * FILTER_BOX_SHARE, abs=2)
+    assert image.right + FILTER_BOX_GAP == box.left
+    assert image.width / image.height == pytest.approx(3840 / 1080, rel=1e-3)
+
+
+@pytest.mark.parametrize("layout_name", ["PBI Page", "PBI Page (Picture)"])
+def test_filter_box_on_slides(sample_template, sample_pages, tmp_path, layout_name):
+    entries = [
+        CapturedEntry("with Filters", URL, sample_pages[0], "Example", filter_box=LINES),
+        CapturedEntry("without Filters", URL, sample_pages[0], "Example"),
+        CapturedEntry("failed", URL, None, "Example", error="x", filter_box=LINES),
+    ]
+    prs = Presentation(build_deck(sample_template, entries, tmp_path / "deck.pptx", layout_name=layout_name, language="en"))
+    with_filters, without_filters, failed = prs.slides
+    area = image_area(with_filters.slide_layout, prs.slide_width, prs.slide_height)
+
+    picture, filter_box = _boxes(with_filters)
+    box = Box.of(filter_box)
+    assert filter_box.text_frame.text.splitlines() == ["Filters", *LINES]
+    assert area.contains(picture) and area.contains(box)
+    assert box.left >= picture.right and box.top == picture.top
+    assert not box.overlaps(Box(0, 0, prs.slide_width, HEADER_BOTTOM))
+    assert box.bottom <= FOOTER_TOP
+    if layout_name == "PBI Page":
+        assert box.right == prs.slide_width - MARGIN  # the title's margin, mirrored
+    else:
+        assert box.right == area.right  # inside the picture placeholder
+
+    unfiltered_picture, none = _boxes(without_filters)
+    assert none is None
+    assert unfiltered_picture.width >= picture.width  # only slides with Filters make room
+    assert all(s.name != "Filter Box" for s in failed.shapes)
