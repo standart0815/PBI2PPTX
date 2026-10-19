@@ -1,9 +1,14 @@
 from starlette.testclient import TestClient
 
+import contextlib
+import time
+
+from PIL import Image
+
 from pbi2pptx.page_url import parse_page_url
-from pbi2pptx.power_bi_window import CurrentPage, NotAReportPage
+from pbi2pptx.power_bi_window import CaptureReport, CurrentPage, FilterCheck, FilterVerdict, NotAReportPage
 from pbi2pptx.server import TOKEN_HEADER, create_app
-from pbi2pptx.window_service import WindowNotOpen, WindowState, WindowStatus
+from pbi2pptx.window_service import Busy, WindowNotOpen, WindowState, WindowStatus
 
 TOKEN = "secret-token"
 AUTH = {TOKEN_HEADER: TOKEN}
@@ -35,11 +40,31 @@ class FakeService:
             raise self.failure
         return CurrentPage(parse_page_url(PAGE), "Umsatz", "Beispielbericht")
 
+    async def check_filters(self, page_url, filters):
+        if self.failure:
+            raise self.failure
+        applied = filters[0].table == "financials"
+        return FilterVerdict(FilterCheck.APPLIED if applied else FilterCheck.NOT_APPLIED, () if applied else tuple(filters))
+
+    @contextlib.asynccontextmanager
+    async def exclusive(self, language):
+        self.calls.append(f"export in {language}")
+        yield FakeWindow()
+
     async def resolve(self, address):
         if self.failure:
             raise self.failure
         parse_page_url(address)  # like the real window: anything else is a ValueError
         return CurrentPage(parse_page_url(address), "Umsatz", "Beispielbericht")
+
+
+class FakeWindow:
+    def is_signed_in(self):
+        return True
+
+    async def capture(self, page_url, filters, out):
+        Image.new("RGB", (1280, 720), "white").save(out)
+        return CaptureReport(filters=FilterCheck.APPLIED if filters else FilterCheck.NO_FILTERS)
 
 
 def make(tmp_path, built=False):
@@ -186,3 +211,50 @@ def test_refuses_what_is_not_a_template(tmp_path):
     assert refused.status_code == 422 and "isn't a PowerPoint template" in refused.json()["error"]
     assert too_big.status_code == 413
     assert still_none == {"template": None}
+
+
+def test_filter_check_answers_in_plain_words(tmp_path):
+    app, service, _ = make(tmp_path)
+    good = {"table": "financials", "column": "Country", "values": ["Germany"]}
+    typo = {"table": "financial", "column": "Country", "values": ["Germany"]}
+    with TestClient(app) as client:
+        ok = client.post("/api/filters/check", headers=AUTH, json={"pageUrl": PAGE, "filter": good}).json()
+        wrong = client.post("/api/filters/check", headers=AUTH, json={"pageUrl": PAGE, "filter": typo}).json()
+        incomplete = client.post("/api/filters/check", headers=AUTH, json={"pageUrl": PAGE, "filter": {"table": "x"}})
+        service.failure = Busy("An Export is running. Wait until it has finished.")
+        busy = client.post("/api/filters/check", headers=AUTH, json={"pageUrl": PAGE, "filter": good})
+    assert ok == {"result": "applied", "message": "Power BI applied it."}
+    assert wrong["result"] == "not applied" and "didn't recognise financial / Country" in wrong["message"]
+    assert incomplete.status_code == 422
+    assert busy.status_code == 409 and "Export is running" in busy.json()["error"]
+
+
+def test_export_runs_and_the_deck_downloads(tmp_path, sample_template):
+    app, service, _ = make(tmp_path)
+    selection = {
+        "name": "Monthly pack: EMEA",
+        "renderLanguage": "en-US",
+        "slideLayout": "PBI Page",
+        "entries": [
+            {"pageUrl": PAGE, "pageName": "Umsatz", "reportName": "Beispielbericht", "slideTitle": "One", "filters": []},
+            {"pageUrl": PAGE, "pageName": "Umsatz", "reportName": "Beispielbericht", "slideTitle": "Two",
+             "filters": [{"table": "financials", "column": "Country", "values": ["Germany"]}]},
+        ],
+    }
+    with TestClient(app) as client:
+        assert client.get("/api/export/deck", headers=AUTH).status_code == 404
+        no_template = client.post("/api/export", headers=AUTH, json={"selection": selection})
+        upload(client, sample_template.read_bytes())
+        assert client.post("/api/export", headers=AUTH, json={"selection": selection}).status_code == 202
+        for _ in range(100):
+            status = client.get("/api/export", headers=AUTH).json()
+            if status["export"]["state"] != "running":
+                break
+            time.sleep(0.1)
+        deck = client.get("/api/export/deck", headers=AUTH)
+    assert no_template.status_code == 409 and "template" in no_template.json()["error"]
+    assert status["export"]["state"] == "done" and status["deckReady"]
+    assert [e["state"] for e in status["export"]["entries"]] == ["captured", "captured"]
+    assert deck.status_code == 200 and deck.content[:2] == b"PK"
+    assert "filename*=UTF-8''Monthly%20pack%20EMEA%20" in deck.headers["content-disposition"]
+    assert "export in en-US" in service.calls

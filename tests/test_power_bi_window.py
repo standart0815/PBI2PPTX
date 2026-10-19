@@ -13,7 +13,7 @@ import pytest
 from PIL import Image, ImageChops
 
 from pbi2pptx.page_url import Filter, ReachedThrough, parse_page_url
-from pbi2pptx.power_bi_window import NotAReportPage, PowerBIWindow
+from pbi2pptx.power_bi_window import FilterCheck, FiltersNotApplied, NotAReportPage, PowerBIWindow
 
 FAKE = (Path(__file__).parent / "fixtures" / "fake_power_bi.html").read_text(encoding="utf-8")
 REPORT = "11111111-0000-0000-0000-000000000001"
@@ -186,3 +186,55 @@ def test_report_name_falls_back_to_the_title_without_the_page_name(tmp_path):
             return await w.current_page()
 
     assert run(check()).report_name == "Beispielbericht"  # from "Umsatz - Beispielbericht – Power BI"
+
+
+def test_applied_filters_are_verified_and_the_pane_is_closed_again(tmp_path):
+    out = tmp_path / "page.png"
+
+    async def check():
+        async with fake_window(tmp_path) as w:
+            report = await w.capture(parse_page_url(WS_PAGE), [Filter.parse("financials/Country=Germany,France")], out)
+            return report, await w.page.locator("filter-pane-modern").count()
+
+    report, pane_left_open = run(check())
+    assert report.filters is FilterCheck.APPLIED
+    assert pane_left_open == 0
+    with Image.open(out) as img:
+        assert img.size == (2560, 1440)  # the full-width canvas, not the one narrowed by the open pane
+
+
+def test_a_filter_power_bi_ignored_stops_the_capture(tmp_path):
+    good, wrong = Filter.parse("financials/Segment=Government"), Filter.parse("financials/Land=Germany")
+
+    async def check():
+        async with fake_window(tmp_path) as w:
+            await w.capture(parse_page_url(WS_PAGE), [good, wrong], tmp_path / "page.png")
+
+    with pytest.raises(FiltersNotApplied) as raised:
+        run(check())
+    assert raised.value.missing == (wrong,)
+    assert not (tmp_path / "page.png").exists()  # no misleading Page Image
+
+
+def test_hidden_filter_pane_means_not_verifiable(tmp_path):
+    async def check():
+        async with fake_window(tmp_path) as w:
+            await w.open_home()
+            await w.page.evaluate("() => localStorage.setItem('fake-no-pane', '1')")
+            return await w.capture(parse_page_url(WS_PAGE), [Filter.parse("financials/Country=Germany")], tmp_path / "page.png")
+
+    report = run(check())
+    assert report.filters is FilterCheck.NOT_VERIFIABLE
+    assert (tmp_path / "page.png").exists()
+
+
+def test_check_button_verifies_without_capturing(tmp_path):
+    async def check():
+        async with fake_window(tmp_path) as w:
+            ok = await w.check_filters(parse_page_url(WS_PAGE), [Filter.parse("financials/Country=Germany")])
+            typo = await w.check_filters(parse_page_url(WS_PAGE), [Filter.parse("financial/Country=Germany")])
+            return ok, typo
+
+    ok, typo = run(check())
+    assert ok.check is FilterCheck.APPLIED
+    assert typo.check is FilterCheck.NOT_APPLIED and typo.missing == (Filter.parse("financial/Country=Germany"),)

@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import os
 import platform
+import re
 import shutil
 import time
 from dataclasses import dataclass, field
@@ -63,18 +64,49 @@ class CurrentPage:
     report_name: str
 
 
+class FilterCheck(str, Enum):
+    NO_FILTERS = "no filters"
+    APPLIED = "applied"
+    NOT_APPLIED = "not applied"
+    NOT_VERIFIABLE = "not verifiable"  # the report hides its filter pane
+
+
+@dataclass(frozen=True)
+class FilterVerdict:
+    check: FilterCheck
+    missing: tuple = ()  # the Filters Power BI didn't apply
+
+
 @dataclass
 class CaptureReport:
     """What happened while capturing one page, for the Export log and the self-check."""
 
     reset: str = "not tried"
     fit_to_page: str = "not tried"
+    filters: FilterCheck = FilterCheck.NO_FILTERS
     seconds: float = 0.0
     notes: list = field(default_factory=list)
 
 
 class NotAReportPage(RuntimeError):
     """The address shows no report page: deleted, no access, or not a page at all."""
+
+
+class FiltersNotApplied(RuntimeError):
+    """Power BI ignored at least one Filter (wrong table or column name); capturing would mislead."""
+
+    def __init__(self, missing: tuple):
+        super().__init__("Power BI did not apply: " + "; ".join(str(f) for f in missing))
+        self.missing = missing
+
+
+def card_shows(title: str, f: Filter) -> bool:
+    """Whether a filter card title such as "Country ist Germany oder France" shows exactly the Filter's values."""
+    if not title.startswith(f.column + " "):
+        return False
+    _operator, _, shown = title[len(f.column) + 1 :].partition(" ")  # "ist" / "is"
+    values = {v.strip() for v in re.split(ui.FILTER_CARD_VALUE_SEPARATORS, shown)}
+    return set(f.values) <= values
 
 
 class PowerBIWindow:
@@ -228,7 +260,14 @@ class PowerBIWindow:
         else:
             report.reset = "not needed"
 
-        # 2. Fit to page.
+        # 2. Did Power BI apply the Filters? A Filter it ignored would give a misleading slide.
+        if filters:
+            verdict = await self.verify_filters(filters)
+            report.filters = verdict.check
+            if verdict.check is FilterCheck.NOT_APPLIED:
+                raise FiltersNotApplied(verdict.missing)
+
+        # 3. Fit to page.
         if await self._is_fit_to_page():
             report.fit_to_page = "already set"
         elif await self._click(ui.VIEW_TAB_TEXTS, role="tab") and (
@@ -240,7 +279,7 @@ class PowerBIWindow:
             await self.page.keyboard.press("Escape")
             report.fit_to_page = "control not found"
 
-        # 3. Clear tips (they appear a few seconds after load) and hover toolbars, then capture.
+        # 4. Clear tips (they appear a few seconds after load) and hover toolbars, then capture.
         for _ in range(3):
             await self._dismiss_overlays()
             await self.page.mouse.move(1, 1)
@@ -260,6 +299,37 @@ class PowerBIWindow:
         await self.page.screenshot(path=str(out), clip=box)
         report.seconds = round(time.monotonic() - started, 1)
         return report
+
+    async def check_filters(self, page_url: PageUrl, filters: Sequence[Filter]) -> FilterVerdict:
+        """For the "Check" button: open the page with its Filters and verify them, without capturing."""
+        await self._open(page_url.with_filters(filters))
+        await self._dismiss_overlays()
+        return await self.verify_filters(filters)
+
+    async def verify_filters(self, filters: Sequence[Filter]) -> FilterVerdict:
+        """Read Power BI's filter pane: every Filter it applied shows as a card with its values."""
+        if not filters:
+            return FilterVerdict(FilterCheck.NO_FILTERS)
+        opened = False
+        pane = self.page.locator(ui.FILTER_PANE)
+        if not await pane.count():
+            if not await self._click(ui.FILTER_PANE_TOGGLE_TEXTS):
+                return FilterVerdict(FilterCheck.NOT_VERIFIABLE)
+            opened = True
+            try:
+                await self.page.locator(ui.FILTER_CARD_TITLES).first.wait_for(state="visible", timeout=10_000)
+            except Exception:  # noqa: BLE001 - pane without cards: nothing applied
+                pass
+        titles = [" ".join(t.split()) for t in await self.page.locator(ui.FILTER_CARD_TITLES).all_inner_texts()]
+        missing = tuple(f for f in filters if not any(card_shows(t, f) for t in titles))
+        if opened:
+            await self._click(ui.FILTER_PANE_TOGGLE_TEXTS)  # close it again: the open pane narrows the canvas
+            try:
+                await pane.wait_for(state="detached", timeout=10_000)
+            except Exception:  # noqa: BLE001
+                pass
+            await self.page.wait_for_timeout(self.settle_ms)
+        return FilterVerdict(FilterCheck.NOT_APPLIED if missing else FilterCheck.APPLIED, missing)
 
     async def _open(self, url: str) -> None:
         await self.page.goto(url)

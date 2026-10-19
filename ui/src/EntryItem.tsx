@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { api } from "./api";
 import { FilterEditor } from "./FilterEditor";
 import { describeFilter, Entry, Filter, reachedThrough } from "./types";
 
@@ -12,6 +13,7 @@ export function EntryItem({
   onDuplicate,
   onRemove,
   onApplyFilterToAll,
+  canCheck,
   drag,
 }: {
   entry: Entry;
@@ -23,6 +25,7 @@ export function EntryItem({
   onDuplicate: () => void;
   onRemove: () => void;
   onApplyFilterToAll: (filter: Filter) => void;
+  canCheck: boolean;
   drag: {
     onDragStart: () => void;
     onDragOver: (e: React.DragEvent) => void;
@@ -98,6 +101,7 @@ export function EntryItem({
           filters={entry.filters}
           onChange={(filters) => onChange({ ...entry, filters })}
           onApplyToAll={onApplyFilterToAll}
+          onCheck={canCheck ? (f) => api.checkFilter(entry.pageUrl, f) : null}
         />
       )}
     </li>

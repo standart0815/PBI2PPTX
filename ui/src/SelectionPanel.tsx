@@ -1,5 +1,5 @@
 import { FormEvent, useRef, useState } from "react";
-import { api, Refused } from "./api";
+import { api, Refused, saveFile } from "./api";
 import { EntryItem } from "./EntryItem";
 import { Entry, EntryJson, Filter, MAX_ENTRIES, sameFilter, Selection, toJson, withId } from "./types";
 
@@ -9,10 +9,12 @@ export function SelectionPanel({
   selection,
   setSelection,
   ready,
+  locked,
 }: {
   selection: Selection;
   setSelection: (update: (s: Selection) => Selection) => void;
   ready: boolean; // the Power BI Window is open and signed in
+  locked: boolean; // an Export is running
 }) {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
@@ -86,11 +88,7 @@ export function SelectionPanel({
   const save = () =>
     attempt(async () => {
       const { fileName, content } = await api.saveSelection(toJson(selection));
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(new Blob([content], { type: "application/json" }));
-      link.download = fileName;
-      link.click();
-      URL.revokeObjectURL(link.href);
+      saveFile(new Blob([content], { type: "application/json" }), fileName);
       setNotice({ kind: "info", text: `Saved as "${fileName}" in your downloads.` });
     });
 
@@ -145,10 +143,10 @@ export function SelectionPanel({
       </div>
 
       <div className="actions">
-        <button type="button" disabled={busy || !ready || full} onClick={addCurrentPage}>
+        <button type="button" disabled={busy || !ready || full || locked} onClick={addCurrentPage}>
           {busy ? "Working…" : "Add current page"}
         </button>
-        <button type="button" className="quiet" disabled={busy || !ready || full} onClick={() => setPasting(!pasting)}>
+        <button type="button" className="quiet" disabled={busy || !ready || full || locked} onClick={() => setPasting(!pasting)}>
           Paste address
         </button>
         <span className="muted small count">
@@ -156,6 +154,7 @@ export function SelectionPanel({
         </span>
       </div>
       {!ready && <p className="muted small">Sign in in the Power BI Window to add pages.</p>}
+      {locked && <p className="muted small">An Export is running. Adding pages and checking Filters wait until it has finished.</p>}
       {full && <p className="muted small">The Selection is full: an Export holds at most {MAX_ENTRIES} Entries.</p>}
 
       {pasting && (
@@ -193,6 +192,7 @@ export function SelectionPanel({
               onDuplicate={() => duplicate(index)}
               onRemove={() => remove(entry.id)}
               onApplyFilterToAll={applyToAll}
+              canCheck={ready && !locked}
               drag={{
                 onDragStart: () => setDragged(index),
                 onDragOver: (e) => {

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, NotRunning, Status } from "./api";
+import { ExportPanel } from "./ExportPanel";
 import { SelectionPanel } from "./SelectionPanel";
 import { TemplatePanel } from "./TemplatePanel";
 import { emptySelection, Selection, TemplateInfo } from "./types";
@@ -25,6 +26,7 @@ export function App() {
   const [error, setError] = useState<string | null>(null);
   const [selection, setSelectionState] = useState<Selection>(loadStoredSelection);
   const [template, setTemplate] = useState<TemplateInfo | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     // The server keeps the picked Template for this run, so a reload can show it again.
@@ -78,6 +80,8 @@ export function App() {
     setPhase("stopped");
   }
 
+  const signedIn = status?.window.state === "open" && status.window.signed_in;
+
   if (phase === "stopped") {
     return (
       <main className="page">
@@ -109,10 +113,13 @@ export function App() {
       <SelectionPanel
         selection={selection}
         setSelection={setSelection}
-        ready={status?.window.state === "open" && status.window.signed_in}
+        ready={signedIn}
+        locked={exporting}
       />
 
       <TemplatePanel template={template} setTemplate={setTemplate} selection={selection} setSelection={setSelection} />
+
+      <ExportPanel selection={selection} template={template} signedIn={signedIn} onRunningChange={setExporting} />
 
       <footer className="bottom">
         <button className="quiet" onClick={quit}>

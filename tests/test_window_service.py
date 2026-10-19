@@ -19,7 +19,11 @@ class FakePowerBIWindow(PowerBIWindow):
 
 def service_for(tmp_path):
     profile = tmp_path / "profile"
-    return WindowService(lambda: FakePowerBIWindow(profile=profile, browsers=(None,), headless=True, settle_ms=100)), profile
+
+    def factory(language):
+        return FakePowerBIWindow(language=language, profile=profile, browsers=(None,), headless=True, settle_ms=100, overlay_wait_ms=600)
+
+    return WindowService(factory), profile
 
 
 def test_opens_the_window_signed_in(tmp_path):
@@ -66,7 +70,7 @@ def test_sign_out_deletes_the_profile_and_reopens(tmp_path):
 
 def test_reports_a_missing_browser(tmp_path):
     async def check():
-        service = WindowService(lambda: PowerBIWindow(profile=tmp_path / "p", browsers=("no-such-browser",), headless=True))
+        service = WindowService(lambda language: PowerBIWindow(language, profile=tmp_path / "p", browsers=("no-such-browser",), headless=True))
         await service.start()
         return await service.status()
 

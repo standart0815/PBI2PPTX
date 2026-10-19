@@ -39,6 +39,7 @@ LABELS = {
         "exported": "Exportiert",
         "error": "Diese Seite konnte nicht erfasst werden.",
         "reason": "Grund",
+        "filter_check": "Filter-Prüfung",
     },
     "en": {
         "report": "Report",
@@ -49,6 +50,7 @@ LABELS = {
         "exported": "Exported",
         "error": "This page could not be captured.",
         "reason": "Reason",
+        "filter_check": "Filter check",
     },
 }
 
@@ -63,6 +65,7 @@ class CapturedEntry:
     report_name: str = ""
     filters: Sequence[str] = field(default_factory=tuple)
     error: str = ""
+    filter_note: str = ""  # e.g. "not possible: the report hides its filter pane"
 
 
 def _drop_template_slides(prs) -> None:
@@ -96,6 +99,8 @@ def _notes(entry: CapturedEntry, labels: dict, exported_at: datetime) -> str:
         f"{labels['filters']}: {filters}",
         f"{labels['exported']}: {exported_at.isoformat(timespec='minutes')}",
     ]
+    if entry.filter_note:
+        lines.append(f"{labels['filter_check']}: {entry.filter_note}")
     if entry.error:
         lines.append(f"{labels['reason']}: {entry.error}")
     return "\n".join(lines)

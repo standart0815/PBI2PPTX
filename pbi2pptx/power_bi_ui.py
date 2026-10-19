@@ -40,6 +40,15 @@ RESET_CONFIRM_TEXTS = ("Zurücksetzen", "Reset")  # exact, inside the dialog
 VIEW_TAB_TEXTS = ("Anzeigen", "View")
 FIT_TO_PAGE_TEXTS = ("An Seite anpassen", "Seite anpassen", "Fit to page")
 
+# The filter pane, used to verify that Power BI applied each URL Filter (DESIGN.md, Filter verification).
+# Collapsed, it isn't in the page at all; opening it narrows the canvas, so it is closed again
+# before capturing. A report that hides its filter pane has no toggle button.
+FILTER_PANE = "filter-pane-modern"
+FILTER_PANE_TOGGLE_TEXTS = ("Filterbereich anzeigen/ausblenden", "Show/hide filter pane")
+# Card titles read "<Column> ist <Value> oder <Value>" ("<Column> is <Value> or <Value>").
+FILTER_CARD_TITLES = "filter-pane-modern div.filterCardTitleSection"
+FILTER_CARD_VALUE_SEPARATORS = r" oder | or |, "
+
 # Tips and promotions laid over the canvas.
 OVERLAYS = (".tutorial-popup", ".ms-TeachingBubble", "[role=dialog]", "[role=alertdialog]")
 TUTORIAL_DISMISS = ".tutorial-popup button.cancel"  # "Vielleicht später" / "Maybe later"

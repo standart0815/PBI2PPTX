@@ -7,6 +7,10 @@
   Test switches (localStorage):
     fake-changed      "1": the User has personal changes, so "Reset to default" is enabled
     fake-actual-size  "1": the canvas is not in fit-to-page view
+    fake-no-pane      "1": the report hides its filter pane (no toggle button)
+
+  URL filters (?filter=…) apply only to known fields (financials/Country, financials/Segment);
+  others are silently ignored, as in Power BI. Applied ones show as filter pane cards.
 -->
 <html>
 <head>
@@ -26,6 +30,7 @@
   .personal { position: absolute; left: 20px; top: 500px; width: 400px; height: 80px; background: #ffc000; }
   .optionsMenu { position: absolute; right: 20px; top: 20px; width: 160px; height: 40px; background: #ff0000; }
   .tutorial-popup { position: absolute; left: 600px; top: 250px; width: 400px; height: 220px; background: #0f6b5c; color: #fff; }
+  filter-pane-modern { position: absolute; right: 0; top: 100px; width: 260px; background: #fff; }
   [role=dialog] { position: absolute; left: 500px; top: 400px; width: 500px; height: 160px; background: #fff; border: 2px solid #333; }
 </style>
 </head>
@@ -47,16 +52,48 @@ function el(tag, attrs = {}, text = "") {
   return e;
 }
 
+const KNOWN_FIELDS = { financials: ["Country", "Segment"] };
+
+function parseFilters(expression) {
+  if (!expression) return [];
+  const unescape = (s) => s.replace(/_x([0-9A-F]{4})_/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+  return expression.split(" and ").map((part) => {
+    const m = part.match(/^(\w+)\/(\w+) (eq|in) (.+)$/);
+    if (!m) return null;
+    const raw = m[3] === "eq" ? [m[4]] : m[4].replace(/^\(|\)$/g, "").split(",");
+    const values = raw.map((v) => v.trim().replace(/^'|'$/g, "").replace(/''/g, "'"));
+    return { table: unescape(m[1]), column: unescape(m[2]), values };
+  }).filter(Boolean);
+}
+
+// Power BI applies only filters on fields that exist, and says nothing about the others.
+const appliedFilters = parseFilters(query.get("filter")).filter((f) => (KNOWN_FIELDS[f.table] || []).includes(f.column));
+let paneOpen = false;
+
+function toggleFilterPane() {
+  paneOpen = !paneOpen;
+  const old = document.querySelector("filter-pane-modern");
+  if (old) old.remove();
+  if (paneOpen) {
+    const pane = el("filter-pane-modern");
+    pane.append(el("div", { class: "filterCardTitleSection" }, "Product ist (alle)"));
+    for (const f of appliedFilters) pane.append(el("div", { class: "filterCardTitleSection" }, `${f.column} ist ${f.values.join(" oder ")}`));
+    document.body.append(pane);
+  }
+  const canvas = document.querySelector(".displayArea");
+  if (canvas) canvas.style.width = paneOpen ? "1000px" : "1280px";  // the open pane narrows the canvas
+}
+
 function renderCanvas(page) {
   const old = document.querySelector(".displayArea");
   if (old) old.remove();
   const canvas = el("div", { class: "displayArea disableAnimations" + (store.get("fake-actual-size") ? "" : " fitToPage") });
+  canvas.style.width = paneOpen ? "1000px" : "1280px";
   canvas.append(el("h1", {}, page.name));
-  const filter = query.get("filter");
   const bar = el("div", { class: "bar" });
-  bar.style.width = filter ? "300px" : "1100px";
+  bar.style.width = appliedFilters.length ? "300px" : "1100px";
   canvas.append(bar);
-  if (filter) canvas.append(el("p", { class: "filter" }, "Filter: " + filter));
+  if (appliedFilters.length) canvas.append(el("p", { class: "filter" }, "Filter: " + appliedFilters.map((f) => f.values.join("/")).join(", ")));
   if (store.get("fake-changed")) canvas.append(el("div", { class: "personal" }));
   canvas.append(el("div", { class: "optionsMenu" }));  // a visual's hover toolbar
   document.body.append(canvas);
@@ -97,6 +134,11 @@ function renderReport(m) {
     document.body.append(dialog);
   };
   ribbon.append(reset);
+  if (!store.get("fake-no-pane")) {
+    const toggle = el("button", { class: "filter-toggle", "aria-label": "Filterbereich anzeigen/ausblenden" }, "Filter");
+    toggle.onclick = toggleFilterPane;
+    ribbon.append(toggle);
+  }
   document.body.append(ribbon);
 
   // Navigation: the report's pages pane, or an App's own navigation.
