@@ -75,6 +75,7 @@ Each step ends with something runnable and tested.
    - The Filter form (table, column, values) with "apply to all Entries".
    - Saving and opening a Saved Selection.
    - Done when: a Selection can be built, saved, reopened and edited.
+   - Status (2026-10-19): **done locally.** `selection.py` holds the Saved Selection format (schemaVersion 1). The API offers adding the current page, pasting addresses (including App links), and saving and opening. The interface has an Entry list with titles, drag-and-drop or ↑/↓, Duplicate and Remove, plus Filters with "Apply to all Entries". Tried live with Workspace and App pages; 68 tests in total.
 5. **Template and settings.**
    - Pick the .potx, then list its layouts with the preselection and warnings, and choose the Render Language.
    - Done when: Firmenvorlage preselects "Tabelle" and shows the warnings found in Milestone 1.
@@ -103,4 +104,5 @@ Each step ends with something runnable and tested.
 
 - **A Power BI interface change breaks capturing.** Mitigated by keeping the brittle parts in one module, the live self-check, and releases that are quick to ship.
 - **Corporate IT blocks unsigned apps or browser automation.** The pilot stays internal and unsigned. Signing is required before other organisations get the tool.
+- **Filter mistakes are silent.** Tested 2026-10-19: a wrong table or column name is ignored, so the slide shows the page unfiltered, and a value that doesn't exist empties the visuals. Power BI shows no message either way. Users could present a Deck that looks filtered but isn't. Worth deciding before the pilot whether the Export should detect it, for example by comparing against an unfiltered capture.
 - **Microsoft's terms on automating the Power BI website.** These are unclear (research found nothing specific). Worth a look before giving the tool to other organisations.

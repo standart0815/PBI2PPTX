@@ -89,6 +89,17 @@ class Filter:
     def __str__(self) -> str:
         return f"{self.table}/{self.column} = {', '.join(self.values)}"
 
+    def to_json(self) -> dict:
+        return {"table": self.table, "column": self.column, "values": list(self.values)}
+
+    @classmethod
+    def from_json(cls, data: dict) -> "Filter":
+        table, column = str(data.get("table", "")).strip(), str(data.get("column", "")).strip()
+        values = tuple(str(v).strip() for v in data.get("values", []) if str(v).strip())
+        if not (table and column and values):
+            raise ValueError("A Filter needs a table, a column and at least one value")
+        return cls(table, column, values)
+
 
 def _escape_name(name: str) -> str:
     # Power BI URL filters encode special characters in table/column names as _xHHHH_.

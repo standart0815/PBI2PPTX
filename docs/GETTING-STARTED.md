@@ -1,6 +1,6 @@
-# Starting PBI2PPTX
+# Starting and using PBI2PPTX
 
-This manual covers version 0.1.0, which is still in development. It starts, signs you in to Power BI and shows your sign-in status. **Adding pages and exporting a Deck come in the next versions** (Milestone 3, steps 4–6). Until the installers exist (step 7), you start it from the project folder with a command.
+This manual covers version 0.1.0, which is still in development. It starts, signs you in to Power BI, and lets you build, save and reopen a Selection of pages. **Choosing a Template and exporting the Deck come in the next versions** (Milestone 3, steps 5–6). Until the installers exist (step 7), you start it from the project folder with a command.
 
 Terms such as *Power BI Window*, *Selection* and *Deck* are explained in [GLOSSARY.md](../GLOSSARY.md).
 
@@ -59,6 +59,51 @@ The buttons:
 - **Show Power BI Window** brings the window to the front, and reopens it if it was closed.
 - **Sign out** deletes the Power BI Window's profile, and with it your Power BI session. You'll sign in again on the next start. Use this on shared computers.
 - **Quit PBI2PPTX** closes the Power BI Window and stops the tool. Pressing **Ctrl+C** in the terminal does the same.
+
+## Building a Selection
+
+A Selection is the ordered list of pages that will become your Deck, one slide per Entry. You can add at most 50 Entries.
+
+### Adding pages
+
+- **Add current page:** open a report page in the Power BI Window, from a Workspace, My workspace or a Power BI App, then click **Add current page**. PBI2PPTX takes the page that is showing.
+- **Paste address:** click **Paste address** and paste either a page's address from the browser's address bar, or a **shared App link** (`…/Redirect?action=OpenApp…`). PBI2PPTX opens it in the Power BI Window and adds the page it lands on.
+
+Each Entry shows its page, its report, and how you reach it (Workspace, My workspace or Power BI App).
+
+### Editing Entries
+
+- **Slide title:** click the title and type. It starts as the page's name. If you leave it empty, the page name comes back.
+- **Order:** drag an Entry by its handle (⋮⋮), or use **↑** and **↓**.
+- **Duplicate:** puts a copy right below, so you can include the same page twice, for example with different Filters.
+- **Remove:** takes the Entry out.
+
+### Filters
+
+Click **Filters** on an Entry to restrict what the page shows on its slide, for example only Germany:
+
+| Field | Example | Where to find it |
+|---|---|---|
+| Table | `financials` | The table's name in the report's data |
+| Column | `Country` | The column's name in that table |
+| Values | `Germany, France` | One or more values, separated by commas |
+
+**Add Filter** adds it. **Apply to all Entries** copies it to every Entry, for example to build the same pack for one region. Without Filters, a page is captured as published.
+
+Power BI doesn't report Filter mistakes, so check the slides:
+- **A table or column name that doesn't match** is silently ignored, and the slide shows the page **unfiltered**. Names must match the report's data model exactly.
+- **A value that doesn't exist** empties the visuals, and the slide shows **empty tables and charts**.
+- **A value made only of digits**, such as `2026`, is treated as a number. On a text column, that Filter won't match.
+
+### Saving and opening
+
+- **Save** downloads the Selection as `<name>.json` into your downloads folder. The name comes from the field at the top, without characters that file names can't hold.
+- **Open…** loads a saved file. It replaces the current Selection, after asking.
+- **New** starts an empty Selection, after asking.
+
+A Saved Selection holds the page addresses, titles and Filters, but no report data. A colleague can open your file; pages they can't access will fail at export.
+
+The Selection also survives a reload of the interface tab. **Quit** and closing the tab don't keep it, so save first.
 
 ## Options
 

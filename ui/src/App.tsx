@@ -1,5 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, NotRunning, Status } from "./api";
+import { SelectionPanel } from "./SelectionPanel";
+import { emptySelection, Selection } from "./types";
+
+// The Selection survives a reload of this tab, and nothing more (sessionStorage).
+const STORAGE_KEY = "pbi2pptx-selection";
+
+function loadStoredSelection(): Selection {
+  try {
+    const stored = sessionStorage.getItem(STORAGE_KEY);
+    return stored ? (JSON.parse(stored) as Selection) : emptySelection();
+  } catch {
+    return emptySelection();
+  }
+}
 
 type Phase = "running" | "stopped" | "unreachable";
 
@@ -8,6 +22,19 @@ export function App() {
   const [phase, setPhase] = useState<Phase>("running");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selection, setSelectionState] = useState<Selection>(loadStoredSelection);
+
+  const setSelection = useCallback((update: (s: Selection) => Selection) => {
+    setSelectionState((current) => {
+      const next = update(current);
+      try {
+        sessionStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // storage unavailable: the Selection simply won't survive a reload
+      }
+      return next;
+    });
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -38,7 +65,8 @@ export function App() {
   }
 
   async function quit() {
-    if (!window.confirm("Quit PBI2PPTX? The Power BI Window closes too.")) return;
+    const unsaved = selection.entries.length ? " Save your Selection first if you want to keep it." : "";
+    if (!window.confirm(`Quit PBI2PPTX? The Power BI Window closes too.${unsaved}`)) return;
     await api.quit().catch(() => undefined);
     setPhase("stopped");
   }
@@ -71,13 +99,11 @@ export function App() {
       <WindowCard status={status} busy={busy} run={run} />
       {error && <p className="error">Something went wrong: {error}</p>}
 
-      <section className="card">
-        <h2>Selection</h2>
-        <p className="muted">No pages yet.</p>
-        <button disabled title="Arrives in the next version">
-          Add current page
-        </button>
-      </section>
+      <SelectionPanel
+        selection={selection}
+        setSelection={setSelection}
+        ready={status?.window.state === "open" && status.window.signed_in}
+      />
 
       <footer className="bottom">
         <button className="quiet" onClick={quit}>
