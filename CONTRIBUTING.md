@@ -15,7 +15,7 @@ Security problems go through [SECURITY.md](SECURITY.md), not public issues.
 
 ## Setting up
 
-You need [uv](https://docs.astral.sh/uv/) (it installs Python 3.12 itself) and [Node.js](https://nodejs.org/) 22 or newer.
+You need [uv](https://docs.astral.sh/uv/) (it installs Python 3.12 itself) and [Node.js](https://nodejs.org/) 24 or newer.
 
 ```bash
 uv sync
