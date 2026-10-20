@@ -166,6 +166,10 @@ legend { font-weight: 600; margin-bottom: 0.4rem; padding: 0; }
 .sk-title, .sk-footer { fill: var(--shape); }
 .sk-area { fill: var(--area); stroke: var(--accent); stroke-dasharray: 4 3; }
 .sk-graphic { fill: var(--graphic); }
+.image-area-fields { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.image-area-fields label { display: flex; flex-direction: column; gap: 0.15rem; }
+.image-area-fields input { width: 6rem; }
+.image-area p { margin: 0.35rem 0 0; }
 .languages { display: flex; flex-direction: column; gap: 0.25rem; }
 .language-option { display: flex; gap: 0.5rem; align-items: baseline; cursor: pointer; }
 

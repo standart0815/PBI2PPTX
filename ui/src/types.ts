@@ -48,7 +48,16 @@ export interface Selection {
   renderLanguage: "de-DE" | "en-US";
   slideLayout: string | null;
   showFilters?: boolean; // a Filter Box on slides whose Entry has Filters (absent in older files)
+  imageArea?: CustomImageArea | null; // null: the Slide Layout's Image Area (absent in older files)
   entries: Entry[];
+}
+
+/** The Custom Image Area, in cm from the slide's top-left corner. */
+export interface CustomImageArea {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
 }
 
 /** Something "Add current page" didn't take over, and why. */
@@ -66,6 +75,7 @@ export const emptySelection = (): Selection => ({
   renderLanguage: "de-DE",
   slideLayout: null,
   showFilters: false,
+  imageArea: null,
   entries: [],
 });
 
@@ -106,6 +116,8 @@ export interface TemplateInfo {
   fileName: string;
   slideWidthCm: number;
   slideHeightCm: number;
+  slideWidthEmu: number;
+  slideHeightEmu: number;
   templateSlides: number;
   preselected: string | null;
   layouts: LayoutInfo[];

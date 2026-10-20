@@ -4,6 +4,7 @@ Image Area rules (docs/DESIGN.md, "Slide composition"):
 - If the Slide Layout has a picture placeholder, its box is the Image Area.
 - Otherwise: full slide width, from the bottom of the title placeholder (the header)
   to the top of the highest footer placeholder, or the slide bottom.
+- A Custom Image Area, set by the User for the whole Deck, replaces both.
 """
 
 from __future__ import annotations
@@ -132,6 +133,26 @@ def image_area(layout, slide_width: int, slide_height: int) -> Box:
     if bottom <= top:
         raise ValueError(f"Slide Layout '{layout.name}' leaves no room below the header")
     return Box(0, top, int(slide_width), bottom - top)
+
+
+EMU_PER_CM = 360_000
+CUSTOM_AREA_SLACK = EMU_PER_CM // 20  # 0.5 mm: the interface rounds to hundredths of a cm
+
+
+class OutsideSlide(ValueError):
+    """A Custom Image Area that reaches outside the slide."""
+
+
+def custom_image_area(box: Box, slide_width: int, slide_height: int) -> Box:
+    """The Custom Image Area on this slide: refused if it reaches outside, trimmed to the slide edge
+    if it only passes it by rounding."""
+    if box.width <= 0 or box.height <= 0 or box.left < 0 or box.top < 0:
+        raise OutsideSlide("The picture area needs a width and a height, and starts on the slide.")
+    if box.right > slide_width + CUSTOM_AREA_SLACK or box.bottom > slide_height + CUSTOM_AREA_SLACK:
+        raise OutsideSlide(
+            f"The picture area reaches outside the slide ({slide_width / EMU_PER_CM:.2f} × {slide_height / EMU_PER_CM:.2f} cm)."
+        )
+    return Box(box.left, box.top, min(box.right, slide_width) - box.left, min(box.bottom, slide_height) - box.top)
 
 
 def decorative_graphics_in_image_area(layout, slide_width: int, slide_height: int) -> List[str]:

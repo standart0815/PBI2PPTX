@@ -126,3 +126,35 @@ def test_broken_date_filters_are_refused(date_filter, message):
     entry = {"pageUrl": PAGE, "filters": [{"table": "Calendar", "column": "Date", **date_filter}]}
     with pytest.raises(SelectionError, match=f"Entry 1: .*{message}"):
         Selection.from_json({"schemaVersion": 2, "entries": [entry]})
+
+
+# --- Custom Image Area ------------------------------------------------------------------------
+
+from pbi2pptx.selection import CustomImageArea  # noqa: E402
+
+
+def test_custom_image_area_round_trips_in_cm():
+    original = selection(image_area=CustomImageArea(1.5, 3.25, 28.0, 14.5))
+    data = json.loads(original.dumps())
+    assert data["imageArea"] == {"left": 1.5, "top": 3.25, "width": 28.0, "height": 14.5}
+    assert data["schemaVersion"] == 1  # older versions read it, and use the layout's area
+    assert Selection.loads(original.dumps()) == original
+    assert original.image_area.box().left == 540_000  # 1.5 cm in EMU
+
+
+def test_files_without_a_custom_image_area_use_the_layouts():
+    data = selection().to_json()
+    assert data["imageArea"] is None
+    del data["imageArea"]
+    assert Selection.from_json(data).image_area is None
+
+
+@pytest.mark.parametrize(
+    "area",
+    [{"left": 1, "top": 2, "width": 0, "height": 3}, {"left": -1, "top": 2, "width": 3, "height": 3}, {"left": "1"}, [1, 2, 3, 4]],
+)
+def test_broken_custom_image_areas_are_refused(area):
+    data = selection().to_json()
+    data["imageArea"] = area
+    with pytest.raises(SelectionError, match="picture area"):
+        Selection.from_json(data)
