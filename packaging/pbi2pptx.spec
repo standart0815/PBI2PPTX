@@ -8,7 +8,9 @@ from PyInstaller.utils.hooks import collect_submodules
 
 ROOT = Path(SPECPATH).parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, SPECPATH)
 from pbi2pptx import __version__  # noqa: E402
+from third_party_licenses import build as third_party_licenses  # noqa: E402
 
 STATIC = ROOT / "pbi2pptx" / "static"
 if not (STATIC / "index.html").exists():
@@ -17,16 +19,30 @@ if not (STATIC / "index.html").exists():
 # Playwright drives the installed Chrome/Edge through its driver (Node + package); no browser is bundled.
 DRIVER = Path(playwright.__file__).parent / "driver"
 
+# Every installer carries PBI2PPTX's own license and the license texts of what it bundles.
+NOTICES = ROOT / "build" / "THIRD-PARTY-LICENSES.txt"
+NOTICES.parent.mkdir(exist_ok=True)
+NOTICES.write_text(third_party_licenses(), encoding="utf-8")
+
 a = Analysis(
     [str(ROOT / "packaging" / "launch.py")],
     pathex=[str(ROOT)],
-    datas=[(str(STATIC), "pbi2pptx/static"), (str(DRIVER), "playwright/driver")],
+    datas=[
+        (str(STATIC), "pbi2pptx/static"),
+        (str(DRIVER), "playwright/driver"),
+        (str(ROOT / "LICENSE"), "."),
+        (str(NOTICES), "."),
+    ],
     hiddenimports=collect_submodules("uvicorn") + collect_submodules("pystray"),  # pystray picks its backend at runtime
     excludes=["tkinter", "pytest", "PyInstaller"],
-    # python-pptx opens its XML templates as "pptx/oxml/../templates/…". Bundled in the archive,
-    # pptx/oxml isn't a real folder, and macOS can't resolve ".." from a folder that doesn't exist.
-    # Shipping python-pptx as source files makes the folder real. `--self-test` checks it.
-    module_collection_mode={"pptx": "py"},
+    module_collection_mode={
+        # python-pptx opens its XML templates as "pptx/oxml/../templates/…". Bundled in the archive,
+        # pptx/oxml isn't a real folder, and macOS can't resolve ".." from a folder that doesn't exist.
+        # Shipping python-pptx as source files makes the folder real. `--self-test` checks it.
+        "pptx": "py",
+        # pystray is LGPL-3.0: as plain source files in the app, it can be replaced by a modified version.
+        "pystray": "py",
+    },
 )
 pyz = PYZ(a.pure)
 exe = EXE(

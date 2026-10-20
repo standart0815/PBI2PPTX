@@ -3,6 +3,19 @@ name = "pbi2pptx"
 version = "0.1.0"
 description = "Turns a user's choice of Power BI report pages into one PowerPoint deck built from their own template."
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Jens Herrmann" }]
+keywords = ["power-bi", "powerpoint", "pptx", "reporting", "playwright"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Web Environment",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business",
+]
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "pillow>=11",
@@ -12,6 +25,11 @@ dependencies = [
     "starlette>=0.40",
     "uvicorn>=0.32",
 ]
+
+[project.urls]
+Homepage = "https://github.com/standart0815/PBI2PPTX"
+Issues = "https://github.com/standart0815/PBI2PPTX/issues"
+Changelog = "https://github.com/standart0815/PBI2PPTX/blob/main/CHANGELOG.md"
 
 [project.scripts]
 pbi2pptx = "pbi2pptx.app:main"
@@ -24,7 +42,7 @@ dev = [
 ]
 
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling>=1.27"]  # 1.27 reads the SPDX license fields
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]

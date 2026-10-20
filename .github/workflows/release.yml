@@ -2,7 +2,7 @@ name: Release build
 
 # Builds the installers. Run it by hand (Actions → Release build → Run workflow), or push a tag
 # such as v0.1.0. The installers are attached to the run as artifacts; with a tag they also go
-# onto a draft GitHub release. They are unsigned (decision Q53: signing before other organisations).
+# onto a draft GitHub release. They are not code-signed yet.
 
 on:
   workflow_dispatch:
@@ -64,4 +64,4 @@ jobs:
       - name: Create a draft release with the installers
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${GITHUB_REF_NAME}" installers/* --repo "${GITHUB_REPOSITORY}" --draft --title "PBI2PPTX ${GITHUB_REF_NAME#v}" --notes "Unsigned pilot build."
+        run: gh release create "${GITHUB_REF_NAME}" installers/* --repo "${GITHUB_REPOSITORY}" --draft --title "PBI2PPTX ${GITHUB_REF_NAME#v}" --notes "Unsigned build. See docs/GETTING-STARTED.md for how to open it."
