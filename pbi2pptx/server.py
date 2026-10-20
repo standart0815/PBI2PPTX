@@ -12,7 +12,7 @@ import contextlib
 import secrets
 from pathlib import Path
 from typing import Callable, Iterable
-from urllib.parse import unquote
+from urllib.parse import quote, unquote
 
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -21,12 +21,15 @@ from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
 from . import __version__
-from .power_bi_window import CurrentPage, NotAReportPage
+from .export import Exporter, ExportRefused
+from .page_url import Filter, parse_page_url
+from .power_bi_window import CurrentPage, FilterCheck, NotAReportPage
 from .selection import Entry, Selection, SelectionError
 from .template import Box, NotATemplate, TemplateInfo, describe_template
-from .window_service import WindowNotOpen, WindowService
+from .window_service import Busy, WindowNotOpen, WindowService
 
 TOKEN_HEADER = "X-PBI2PPTX-Token"
+PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 FILE_NAME_HEADER = "X-File-Name"
 MAX_TEMPLATE_BYTES = 100 * 1024 * 1024
 EMU_PER_CM = 360_000
@@ -93,6 +96,7 @@ def create_app(
     allowed = set(allowed_hosts)
     # The Template the User picked: in memory only, for the Export (ADR 0003: nothing stored).
     template: dict = {}
+    exporter = Exporter(service)
 
     def guard(request: Request, needs_token: bool) -> Response | None:
         if request.headers.get("host", "") not in allowed:
@@ -124,7 +128,10 @@ def create_app(
         return JSONResponse({"ok": True})
 
     async def sign_out(request: Request) -> Response:
-        await service.sign_out()
+        try:
+            await service.sign_out()
+        except Busy as e:
+            return problem(409, str(e))
         return JSONResponse({"ok": True})
 
     def proposed_entry(current: CurrentPage) -> dict:
@@ -133,7 +140,7 @@ def create_app(
     async def add_current_page(request: Request) -> Response:
         try:
             return JSONResponse({"entry": proposed_entry(await service.current_page())})
-        except WindowNotOpen as e:
+        except (WindowNotOpen, Busy) as e:
             return problem(409, str(e))
         except NotAReportPage:
             return problem(422, "The Power BI Window isn't showing a report page. Open the page you want there, then try again.")
@@ -142,7 +149,7 @@ def create_app(
         address = str((await json_body(request)).get("address", "")).strip()
         try:
             return JSONResponse({"entry": proposed_entry(await service.resolve(address))})
-        except WindowNotOpen as e:
+        except (WindowNotOpen, Busy) as e:
             return problem(409, str(e))
         except NotAReportPage as e:
             return problem(422, str(e))
@@ -183,6 +190,50 @@ def create_app(
         template.update(data=data, info=info)
         return JSONResponse({"template": template_json(info)})
 
+    async def check_filter(request: Request) -> Response:
+        body = await json_body(request)
+        try:
+            page_url = parse_page_url(str(body.get("pageUrl", "")))
+            flt = Filter.from_json(body.get("filter") or {})
+        except (ValueError, AttributeError):
+            return problem(422, "A Filter check needs a page address and a complete Filter.")
+        try:
+            verdict = await service.check_filters(page_url, [flt])
+        except (WindowNotOpen, Busy) as e:
+            return problem(409, str(e))
+        except NotAReportPage as e:
+            return problem(422, str(e))
+        messages = {
+            FilterCheck.APPLIED: "Power BI applied it.",
+            FilterCheck.NOT_APPLIED: f"Power BI didn't recognise {flt.table} / {flt.column}. Check the table and column names.",
+            FilterCheck.NOT_VERIFIABLE: "Can't check: this report hides its filter pane.",
+        }
+        return JSONResponse({"result": verdict.check.value, "message": messages.get(verdict.check, "")})
+
+    async def start_export(request: Request) -> Response:
+        try:
+            selection = Selection.from_json({**((await json_body(request)).get("selection") or {}), "schemaVersion": 1})
+            exporter.start(selection, template.get("data"))
+        except (SelectionError, ExportRefused) as e:
+            return problem(409 if isinstance(e, ExportRefused) else 422, str(e))
+        return JSONResponse({"ok": True}, status_code=202)
+
+    async def export_progress(request: Request) -> Response:
+        return JSONResponse({"export": exporter.progress.to_json(), "deckReady": exporter.deck() is not None})
+
+    async def cancel_export(request: Request) -> Response:
+        exporter.cancel()
+        return JSONResponse({"ok": True})
+
+    async def download_deck(request: Request) -> Response:
+        deck = exporter.deck()
+        if deck is None:
+            return problem(404, "There is no Deck to download. Run an Export first.")
+        file_name, data = deck
+        fallback = file_name.encode("ascii", "replace").decode().replace("?", "_").replace('"', "")
+        disposition = f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(file_name)}"
+        return Response(data, media_type=PPTX, headers={"Content-Disposition": disposition})
+
     async def quit_tool(request: Request) -> Response:
         on_quit()
         return JSONResponse({"ok": True})
@@ -197,9 +248,10 @@ def create_app(
             opening.cancel()
             with contextlib.suppress(BaseException):
                 await opening
+            await exporter.stop()
             await service.stop()
 
-    app_state = {"template": template}  # read by the Export (step 6)
+    app_state = {"template": template, "exporter": exporter}
     routes = [
         Route("/", index),
         Route("/api/status", api(status)),
@@ -209,6 +261,11 @@ def create_app(
         Route("/api/entries/resolve", api(add_by_address), methods=["POST"]),
         Route("/api/selection/open", api(open_selection), methods=["POST"]),
         Route("/api/selection/save", api(save_selection), methods=["POST"]),
+        Route("/api/filters/check", api(check_filter), methods=["POST"]),
+        Route("/api/export", api(export_progress)),
+        Route("/api/export", api(start_export), methods=["POST"]),
+        Route("/api/export/cancel", api(cancel_export), methods=["POST"]),
+        Route("/api/export/deck", api(download_deck)),
         Route("/api/template", api(get_template)),
         Route("/api/template", api(put_template), methods=["POST"]),
         Route("/api/quit", api(quit_tool), methods=["POST"]),

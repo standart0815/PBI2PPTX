@@ -1,6 +1,6 @@
 # Starting and using PBI2PPTX
 
-This manual covers version 0.1.0, which is still in development. It starts, signs you in to Power BI, lets you build, save and reopen a Selection of pages, and lets you choose the Template, Slide Layout and Render Language. **Exporting the Deck comes in the next version** (Milestone 3, step 6). Until the installers exist (step 7), you start it from the project folder with a command.
+This manual covers version 0.1.0, which is still in development. It covers the whole path: sign in to Power BI, build a Selection of pages, choose the Template, Slide Layout and Render Language, and export the Deck. Until the installers exist (step 7), you start it from the project folder with a command.
 
 Terms such as *Power BI Window*, *Selection* and *Deck* are explained in [GLOSSARY.md](../GLOSSARY.md).
 
@@ -90,8 +90,15 @@ Click **Filters** on an Entry to restrict what the page shows on its slide, for 
 
 **Add Filter** adds it. **Apply to all Entries** copies it to every Entry, for example to build the same pack for one region. Without Filters, a page is captured as published.
 
-Power BI doesn't report Filter mistakes, so check the slides:
-- **A table or column name that doesn't match** is silently ignored, and the slide shows the page **unfiltered**. Names must match the report's data model exactly.
+**Check** opens the page with that Filter in the Power BI Window and tells you, in about 10 seconds, whether Power BI applied it:
+- **✓ Power BI applied it.**
+- **✗ Power BI didn't recognise …**: the table or column name doesn't match the report's data model. Fix the names.
+- **? Can't check**: the report hides its filter pane.
+
+Checking is optional, because the Export checks every Filter anyway. It's a quick way to catch typos while you build the Selection.
+
+Mistakes Power BI itself doesn't report:
+- **A table or column name that doesn't match** is silently ignored by Power BI. PBI2PPTX catches it: "Check" shows ✗, and the Export puts an Error Slide in its place instead of an unfiltered page.
 - **A value that doesn't exist** empties the visuals, and the slide shows **empty tables and charts**.
 - **A value made only of digits**, such as `2026`, is treated as a number. On a text column, that Filter won't match.
 
@@ -125,6 +132,27 @@ Every page slide uses the same layout from the Template. PBI2PPTX recommends one
 ### Render Language
 
 Chooses how numbers and dates appear in the pages: **Deutsch** (`1.234,56`, `31.12.2026`) or **English** (`1,234.56`, `12/31/2026`). Texts stored in the report data, such as month names in a column, stay as they are.
+
+## Exporting the Deck
+
+The **Export** panel says what's missing before you can start: pages, a Template, or the sign-in. When everything is there, click **Export Deck**.
+
+- **The Power BI Window works through every page**, about 10 seconds each, so 20 pages take 3–4 minutes. Please don't click in it meanwhile. "Show Power BI Window" still works if you want to watch.
+- **If you chose English as the Render Language**, the Power BI Window first restarts in English. Your sign-in is kept.
+- **Progress** shows which page is being captured. **Cancel after this page** stops the Export, and then no Deck is made.
+- Adding pages, pasting addresses and checking Filters wait until the Export has finished.
+
+When it's done, the panel shows a summary and each Entry's result:
+
+| Mark | Meaning | On the slide |
+|---|---|---|
+| ✓ | Captured, and every Filter was applied | The page |
+| ? | Captured, but its Filters couldn't be verified because the report hides its filter pane | The page; the speaker notes say "Filter-Prüfung: nicht möglich" |
+| ✗ | Not captured: page deleted, no access, or a Filter Power BI didn't apply | An **Error Slide** naming the page and the reason |
+
+**Download Deck** saves `<Selection name> <date>.pptx` into your downloads folder. The Deck stays available until you export again or quit PBI2PPTX, at most one hour. The Page Images are deleted as soon as the Export ends.
+
+Each slide's **speaker notes** say where it came from: the report, the page, its address in Power BI, the Filters and the export time. That lets anyone trace a slide back later.
 
 ## Options
 

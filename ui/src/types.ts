@@ -85,3 +85,27 @@ export interface TemplateInfo {
   preselected: string | null;
   layouts: LayoutInfo[];
 }
+
+// The Export's progress (pbi2pptx/export.py, ExportProgress).
+export type EntryState = "waiting" | "capturing" | "captured" | "not verified" | "error slide";
+
+export interface EntryProgress {
+  title: string;
+  filters: Filter[];
+  state: EntryState;
+  message: string;
+  seconds: number;
+}
+
+export interface ExportProgress {
+  state: "idle" | "running" | "done" | "cancelled" | "failed";
+  entries: EntryProgress[];
+  phase: string;
+  file_name: string;
+  error: string;
+}
+
+export interface FilterCheckResult {
+  result: "applied" | "not applied" | "not verifiable";
+  message: string;
+}

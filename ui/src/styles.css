@@ -158,3 +158,16 @@ legend { font-weight: 600; margin-bottom: 0.4rem; padding: 0; }
 .sk-graphic { fill: var(--graphic); }
 .languages { display: flex; flex-direction: column; gap: 0.25rem; }
 .language-option { display: flex; gap: 0.5rem; align-items: baseline; cursor: pointer; }
+
+/* --- Export ------------------------------------------------------------------------------ */
+.check { display: block; }
+progress.bar { width: 100%; height: 0.6rem; accent-color: var(--accent); }
+.export-entries { list-style: none; padding: 0; margin: 1rem 0 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.export-entry { display: flex; gap: 0.6rem; align-items: baseline; }
+.export-entry > div { flex: 1; min-width: 0; }
+.export-entry .mark { width: 1.2rem; text-align: center; font-weight: 700; color: var(--muted); }
+.export-entry.captured .mark { color: var(--ok); }
+.export-entry.not-verified .mark, .export-entry.not-verified .entry-message { color: var(--attention); }
+.export-entry.error-slide .mark, .export-entry.error-slide .entry-message { color: var(--problem); }
+.entry-message { margin: 0.1rem 0 0; }
+.result p { margin: 0.5rem 0; }

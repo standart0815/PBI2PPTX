@@ -107,7 +107,7 @@ async def run(routes: list, flt: Filter, template: Path | None, folder: Path) ->
                     results.add(
                         f"capture {label}",
                         not report.notes,
-                        f"{size[0]}×{size[1]} px in {report.seconds} s, reset: {report.reset}, fit to page: {report.fit_to_page}"
+                        f"{size[0]}×{size[1]} px in {report.seconds} s, reset: {report.reset}, fit to page: {report.fit_to_page}, filters: {report.filters.value}"
                         + (f", {'; '.join(report.notes)}" if report.notes else ""),
                     )
                     images[label] = out

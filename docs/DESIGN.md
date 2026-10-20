@@ -16,6 +16,7 @@ Terms are defined in [GLOSSARY.md](../GLOSSARY.md). The decisions behind the des
    - **"Add current page"** adds the page currently showing as an Entry. A Page URL can also be pasted. A shared App link (`/Redirect?action=OpenApp…`) is opened in the Power BI Window and resolved to the page it lands on.
    - Each Entry holds a Page URL, a slide title (the page name by default, editable) and its Filters.
    - Filters are entered in a small form (table, column, values). The tool turns them into Power BI's URL filter syntax, for example `?filter=Table/Column in ('A','B')`. An "apply to all Entries" button covers the "same pack for each region or month" case.
+   - Each Filter has an optional **"Check"** button. It opens the page with that Filter in the Power BI Window and reports whether Power BI applied it (see Filter verification).
    - Entries can be reordered by drag and drop, can repeat the same page, and can mix Reports from different Workspaces and Power BI Apps.
 3. **Saved Selection**
    - The Selection has a name and is saved as `<name>.json` wherever the User chooses.
@@ -31,6 +32,11 @@ Terms are defined in [GLOSSARY.md](../GLOSSARY.md). The decisions behind the des
    - It clicks **"Reset to default"** when Power BI offers it, so persisted personal filters and slicer selections don't leak into the image. The result is the Default State plus the Entry's Filters.
    - It switches the page to **"Fit to page"**, sizes the window to the page, and captures **only the report canvas** at 2× pixel density, without Power BI's header, navigation or panes.
    - The Render Language is set through the browser's language.
+   - **Filter verification:** Power BI silently ignores a URL filter whose table or column doesn't exist, which would give an unfiltered slide that looks filtered. So after opening a filtered page, the tool reads Power BI's filter pane. Every Filter Power BI accepted appears there as a card for its column showing its values (for example "Country ist Germany oder France"). The outcomes:
+     - **Applied:** the card is there with every value. The page is captured.
+     - **Not applied:** the card is missing or lacks a value. The Entry becomes an **Error Slide** naming the Filter ("financials/Land was not applied: check the table and column name"). The Export carries on.
+     - **Not verifiable:** the report hides its filter pane. The page is captured, and the speaker notes and the Export summary say "Filter not verified".
+     - **Values that don't exist** (for example "Atlantis") are accepted by Power BI and give empty visuals. They are not detected: the slide is visibly empty, and the Export summary lists every Entry's Filters for review.
 6. **Slides**: see [Slide composition](#slide-composition).
 7. **Result**
    - The Deck is saved as `<name> <YYYY-MM-DD>.pptx`.

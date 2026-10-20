@@ -7,15 +7,21 @@ every operation with one lock ("Add current page" and an Export must never run a
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from dataclasses import asdict, dataclass
 from enum import Enum
-from typing import Callable
+from typing import AsyncIterator, Callable, Sequence
 
-from .power_bi_window import CurrentPage, PowerBIWindow, sign_out
+from .page_url import Filter, PageUrl
+from .power_bi_window import CurrentPage, FilterVerdict, PowerBIWindow, sign_out
 
 
 class WindowNotOpen(RuntimeError):
     """The Power BI Window is starting, closed or failed; the interface tells the User what to do."""
+
+
+class Busy(RuntimeError):
+    """An Export is using the Power BI Window."""
 
 
 class WindowState(str, Enum):
@@ -39,8 +45,9 @@ class WindowStatus:
 
 
 class WindowService:
-    def __init__(self, factory: Callable[[], PowerBIWindow] = PowerBIWindow):
-        self._factory = factory
+    def __init__(self, factory: Callable[[str], PowerBIWindow] = PowerBIWindow, language: str = "de-DE"):
+        self._factory = factory  # called with the Render Language
+        self.language = language
         self._window: PowerBIWindow | None = None
         self._state = WindowState.CLOSED
         self._message = ""
@@ -66,6 +73,9 @@ class WindowService:
 
     async def show(self) -> None:
         """Bring the Power BI Window to the front, reopening it if the User closed it."""
+        if self.busy and self._window is not None:  # during an Export: just show it, don't wait
+            await self._window.page.bring_to_front()
+            return
         async with self._lock:
             if self._state is not WindowState.OPEN:
                 await self._close()
@@ -73,17 +83,50 @@ class WindowService:
             if self._window:
                 await self._window.page.bring_to_front()
 
+    @property
+    def busy(self) -> bool:
+        return self._lock.locked()
+
     async def current_page(self) -> CurrentPage:
         """The page showing in the Power BI Window, for "Add current page"."""
-        async with self._lock:
+        async with self._quick_lock():
             return await self._open_window().current_page()
 
     async def resolve(self, address: str) -> CurrentPage:
         """Open a pasted Page URL or App link in the Power BI Window and read the page it lands on."""
-        async with self._lock:
+        async with self._quick_lock():
             window = self._open_window()
             await window.page.bring_to_front()
             return await window.resolve(address)
+
+    async def check_filters(self, page_url: PageUrl, filters: Sequence[Filter]) -> FilterVerdict:
+        """For the "Check" button: does Power BI apply these Filters on this page?"""
+        async with self._quick_lock():
+            window = self._open_window()
+            await window.page.bring_to_front()
+            return await window.check_filters(page_url, filters)
+
+    @contextlib.asynccontextmanager
+    async def exclusive(self, language: str) -> AsyncIterator[PowerBIWindow]:
+        """The window for an Export, in the Render Language, with nobody else driving it meanwhile."""
+        async with self._lock:
+            window = self._open_window()
+            if language != self.language:
+                # The browser's language is fixed at launch: reopen with the same profile (and session).
+                self.language = language
+                await self._close()
+                await self._open()
+                window = self._open_window()
+            if not window.is_signed_in():
+                raise WindowNotOpen("Sign in to Power BI in the Power BI Window first.")
+            yield window
+
+    @contextlib.asynccontextmanager
+    async def _quick_lock(self):
+        if self._lock.locked():
+            raise Busy("An Export is running. Wait until it has finished.")
+        async with self._lock:
+            yield
 
     def _open_window(self) -> PowerBIWindow:
         if self._state is not WindowState.OPEN or self._window is None:
@@ -92,7 +135,7 @@ class WindowService:
 
     async def sign_out(self) -> None:
         """Close the window, delete its profile (the Power BI session), and reopen it at sign-in."""
-        async with self._lock:
+        async with self._quick_lock():
             profile = self._window.profile if self._window else None
             await self._close()
             sign_out(profile)
@@ -100,7 +143,7 @@ class WindowService:
 
     async def _open(self) -> None:
         self._state, self._message = WindowState.STARTING, ""
-        window = self._factory()
+        window = self._factory(self.language)
         try:
             await window.__aenter__()
             window.context.on("close", lambda _: self._mark_closed(window))

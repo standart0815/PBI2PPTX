@@ -90,5 +90,5 @@ The PowerPoint file an Export produces, with one slide per Entry.
 _Avoid_: presentation, PowerPoint, report
 
 **Error Slide**:
-The slide that takes the place of an Entry whose Report Page could not be captured, for example because it was deleted or the User has no access. It names the page and the reason.
+The slide that takes the place of an Entry whose Report Page could not be captured: for example, the page was deleted, the User has no access, or Power BI did not apply one of its Filters. It names the page and the reason.
 _Avoid_: placeholder slide, blank slide
