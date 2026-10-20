@@ -1,6 +1,6 @@
 # Starting and using PBI2PPTX
 
-This manual covers version 0.1.0, which is still in development. It covers the whole path: sign in to Power BI, build a Selection of pages, choose the Template, Slide Layout and Render Language, and export the Deck. Until the installers exist (step 7), you start it from the project folder with a command.
+This manual covers version 0.1.0, a pilot version. It covers the whole path: install, sign in to Power BI, build a Selection of pages, choose the Template, Slide Layout and Render Language, and export the Deck.
 
 Terms such as *Power BI Window*, *Selection* and *Deck* are explained in [GLOSSARY.md](../GLOSSARY.md).
 
@@ -8,33 +8,32 @@ Terms such as *Power BI Window*, *Selection* and *Deck* are explained in [GLOSSA
 
 - **macOS or Windows**
 - **Google Chrome or Microsoft Edge**, installed as usual. PBI2PPTX uses it for the Power BI Window. Edge is preferred on Windows and Chrome on macOS.
-- **[uv](https://docs.astral.sh/uv/)**, which installs the right Python by itself.
-- **[Node.js](https://nodejs.org/)** 22 or newer, only for building the interface once.
 
-## First-time setup
+## Installing
 
-In a terminal, in the project folder:
+The pilot installers are **not code-signed** yet, so macOS and Windows warn before the first start. This is expected during the pilot.
 
-```bash
-uv sync
-npm --prefix ui install
-npm --prefix ui run build
-```
+**macOS:** open `PBI2PPTX-0.1.0-macOS.dmg` and drag **PBI2PPTX** into **Applications**. On the first start, macOS says it can't check the app:
+1. Click **Done**.
+2. Open **System Settings → Privacy & Security**, scroll down to "PBI2PPTX was blocked…", and click **Open Anyway**.
 
-Repeat the last two commands whenever the interface (`ui/`) has changed.
+From then on it starts normally.
+
+**Windows:** run `PBI2PPTX-0.1.0-Windows-Setup.exe`. If SmartScreen says "Windows protected your PC", click **More info → Run anyway**. The installer needs no administrator rights. It installs for you only and adds PBI2PPTX to the Start menu, optionally to the desktop too. Uninstall it under *Settings → Apps*.
 
 ## Starting
 
-```bash
-uv run pbi2pptx
-```
-
-Two windows open:
+Start **PBI2PPTX** from *Applications* (macOS) or the Start menu (Windows). Three things appear:
 
 1. **The PBI2PPTX interface**, in your default browser. Everything is controlled from here.
 2. **The Power BI Window**, a Chrome or Edge window with its own profile, separate from your normal browser. It opens Power BI.
+3. **The PBI2PPTX icon** (a blue tile with three white bars) in the **menu bar** (macOS) or the **notification area** next to the clock (Windows). PBI2PPTX has no window of its own. This icon shows that it's running:
+   - **Open PBI2PPTX** brings the interface back, for example after you closed its tab.
+   - **Quit PBI2PPTX** stops it and closes the Power BI Window.
 
-The terminal shows the interface's address. It contains a secret that changes with every start, so an old bookmark won't work. Start PBI2PPTX again instead.
+Starting PBI2PPTX while it is already running opens its interface again instead of starting a second copy (on macOS, use the menu bar icon).
+
+The interface's address contains a secret that changes with every start, so a bookmark won't work. Use the icon instead.
 
 ## Signing in
 
@@ -58,7 +57,7 @@ The buttons:
 
 - **Show Power BI Window** brings the window to the front, and reopens it if it was closed.
 - **Sign out** deletes the Power BI Window's profile, and with it your Power BI session. You'll sign in again on the next start. Use this on shared computers.
-- **Quit PBI2PPTX** closes the Power BI Window and stops the tool. Pressing **Ctrl+C** in the terminal does the same.
+- **Quit PBI2PPTX** closes the Power BI Window and stops the tool, like **Quit** in the menu bar / tray icon.
 
 ## Building a Selection
 
@@ -154,29 +153,48 @@ When it's done, the panel shows a summary and each Entry's result:
 
 Each slide's **speaker notes** say where it came from: the report, the page, its address in Power BI, the Filters and the export time. That lets anyone trace a slide back later.
 
-## Options
+## For developers: starting from the project folder
+
+Without the installer, you need [uv](https://docs.astral.sh/uv/) and [Node.js](https://nodejs.org/) 22 or newer. Once, and again whenever `ui/` changes:
 
 ```bash
-uv run pbi2pptx --no-open      # don't open the interface automatically; open the printed address yourself
-uv run pbi2pptx --port 8765    # use a fixed port instead of any free one
-uv run pbi2pptx --version
+uv sync
+npm --prefix ui install
+npm --prefix ui run build
 ```
+
+Then:
+
+```bash
+uv run pbi2pptx                # prints the interface address; quit with Ctrl+C or from the interface
+uv run pbi2pptx --tray         # also show the menu bar / tray icon, like the installed app
+uv run pbi2pptx --no-open      # don't open the interface automatically
+uv run pbi2pptx --port 8765    # use a fixed port instead of any free one
+```
+
+Building the installers: `packaging/build_macos.sh` on a Mac, `packaging/build_windows.ps1` on Windows (needs Inno Setup). Alternatively, use the *Release build* workflow on GitHub.
 
 ## What is stored, and where
 
-Only the Power BI Window's profile, which includes your Power BI session:
+In one folder:
 
-- **macOS:** `~/Library/Application Support/PBI2PPTX/profile`
-- **Windows:** `%LOCALAPPDATA%\PBI2PPTX\profile`
+- **macOS:** `~/Library/Application Support/PBI2PPTX/`
+- **Windows:** `%LOCALAPPDATA%\PBI2PPTX\`
 
-**Sign out** deletes it. Nothing is sent anywhere except to Power BI.
+It holds:
+- `profile/`: the Power BI Window's profile, which includes your Power BI session. **Sign out** deletes it.
+- `pbi2pptx.log`: what PBI2PPTX did (starts, quits, errors). Never report content. Send it along when reporting a problem.
+- `instance.json`: while PBI2PPTX runs, so a second start can find it.
+
+Nothing is sent anywhere except to Power BI.
 
 ## Troubleshooting
 
 | You see | Cause | Fix |
 |---|---|---|
-| "The interface isn't built yet" | The interface build is missing. | Run `npm --prefix ui install` and `npm --prefix ui run build`, then reload. |
-| "Please start PBI2PPTX from its icon or command" | An address from an earlier start. | Start PBI2PPTX again and use the new address. |
-| "PBI2PPTX isn't running" | The tool was quit, or the terminal was closed. | Start it again. |
+| You closed the interface tab | PBI2PPTX is still running. | Menu bar / tray icon → **Open PBI2PPTX**. |
+| "Please start PBI2PPTX from its icon or command" | An address from an earlier start. | Use the icon's **Open PBI2PPTX**, or start PBI2PPTX. |
+| "PBI2PPTX isn't running" | PBI2PPTX was quit. | Start it again. |
+| "The interface isn't built yet" | Developer start without the interface build. | Run `npm --prefix ui install` and `npm --prefix ui run build`, then reload. |
 | The start takes up to 30 seconds | The Power BI Window from the last run is still closing. | Wait. PBI2PPTX waits for it. |
 | Power BI asks you to sign in every time | You answered "No" to "Stay signed in?", or your company doesn't allow it. | Answer Yes. If your company forbids it, you'll sign in on every start. |

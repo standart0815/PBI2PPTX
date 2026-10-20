@@ -20,7 +20,7 @@ from starlette.responses import FileResponse, HTMLResponse, JSONResponse, Respon
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
-from . import __version__
+from . import __version__, static_dir
 from .export import Exporter, ExportRefused
 from .page_url import Filter, parse_page_url
 from .power_bi_window import CurrentPage, FilterCheck, NotAReportPage
@@ -33,7 +33,7 @@ PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentatio
 FILE_NAME_HEADER = "X-File-Name"
 MAX_TEMPLATE_BYTES = 100 * 1024 * 1024
 EMU_PER_CM = 360_000
-STATIC = Path(__file__).parent / "static"  # the built interface (ui/, `npm run build`)
+STATIC = static_dir()  # the built interface (ui/, `npm run build`)
 
 NOT_BUILT = """<!doctype html><meta charset="utf-8"><title>PBI2PPTX</title>
 <body style="font-family:sans-serif;max-width:40rem;margin:3rem auto">
