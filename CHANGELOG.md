@@ -4,6 +4,7 @@ All notable changes to PBI2PPTX are listed here. Versions follow [Semantic Versi
 
 ## Unreleased
 
+- **Your own picture area:** set where pages go on the slide (top-left corner, maximum width and height in cm) instead of the layout's picture area. It is saved in the Saved Selection.
 - **Open** and **Open with Filters** on each Entry show its page in the Power BI Window for a quick check, without or with the Entry's Filters.
 
 ## 0.1.0

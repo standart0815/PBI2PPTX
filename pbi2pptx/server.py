@@ -26,14 +26,13 @@ from .export import Exporter, ExportRefused
 from .page_url import DateFilter, filter_from_json, parse_page_url
 from .power_bi_window import CurrentPage, FilterCheck, NotAReportPage
 from .selection import SCHEMA_VERSION, Entry, Selection, SelectionError
-from .template import Box, NotATemplate, TemplateInfo, describe_template
+from .template import EMU_PER_CM, Box, NotATemplate, OutsideSlide, TemplateInfo, custom_image_area, describe_template
 from .window_service import Busy, WindowNotOpen, WindowService
 
 TOKEN_HEADER = "X-PBI2PPTX-Token"
 PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 FILE_NAME_HEADER = "X-File-Name"
 MAX_TEMPLATE_BYTES = 100 * 1024 * 1024
-EMU_PER_CM = 360_000
 STATIC = static_dir()  # the built interface (ui/, `npm run build`)
 
 NOT_BUILT = """<!doctype html><meta charset="utf-8"><title>PBI2PPTX</title>
@@ -69,6 +68,8 @@ def template_json(info: TemplateInfo) -> dict:
         "fileName": info.file_name,
         "slideWidthCm": round(w / EMU_PER_CM, 1),
         "slideHeightCm": round(h / EMU_PER_CM, 1),
+        "slideWidthEmu": w,  # exact, for the Custom Image Area
+        "slideHeightEmu": h,
         "templateSlides": info.template_slides,
         "preselected": info.preselected,
         "layouts": [
@@ -239,8 +240,11 @@ def create_app(
     async def start_export(request: Request) -> Response:
         try:
             selection = Selection.from_json({**((await json_body(request)).get("selection") or {}), "schemaVersion": SCHEMA_VERSION})
+            if selection.image_area and template:
+                info = template["info"]
+                custom_image_area(selection.image_area.box(), info.slide_width, info.slide_height)
             exporter.start(selection, template.get("data"))
-        except (SelectionError, ExportRefused) as e:
+        except (SelectionError, ExportRefused, OutsideSlide) as e:
             return problem(409 if isinstance(e, ExportRefused) else 422, str(e))
         return JSONResponse({"ok": True}, status_code=202)
 

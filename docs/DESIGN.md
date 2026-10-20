@@ -84,6 +84,11 @@ Terms are defined in [GLOSSARY.md](../GLOSSARY.md). The decisions behind the des
 - The **Image Area** is defined as follows:
   - **Default:** the full slide width, from the bottom edge of the title placeholder (the header) down to the top of the highest footer placeholder, or to the bottom of the slide if there are no footers.
   - **Override:** if the Slide Layout has a picture placeholder, that placeholder's box is the Image Area instead. Template authors use this when the header band reaches lower than the title placeholder.
+  - **Custom Image Area:** the User can set their own Image Area for the whole Deck: the top-left corner, a maximum width and a maximum height, in cm from the slide's top-left corner. It replaces both rules above and is stored in the Saved Selection (a Saved Selection without one uses the layout's).
+    - The fields start with the layout's own Image Area, the layout sketch follows them as they change, and "Back to the layout's area" undoes them.
+    - The Page Image, the Filter Box and the text of an Error Slide all stay inside it, with the same rules as in the layout's area.
+    - It may overlap the title, the footers or a Decorative Graphic, with a warning. It may never reach outside the slide: the interface refuses such values, and an Export with one doesn't start.
+    - Choosing another Slide Layout keeps it. Choosing a Template whose slides it doesn't fit on drops it, with a notice.
 - The Page Image is made **as large as possible inside the Image Area, anchored top-left**. It is never cropped, never stretched, and never covers the header or footers.
   - It fills the full width whenever the height allows.
   - Example: a 16:9 page on a 33.9 × 19.1 cm slide whose header ends at 3 cm becomes 28.5 × 16.1 cm, with 5.3 cm left empty on the right.

@@ -273,6 +273,16 @@ def test_export_runs_and_the_deck_downloads(tmp_path, sample_template):
     assert "export in en-US" in service.calls
 
 
+def test_export_refuses_a_picture_area_outside_the_slide(tmp_path, sample_template):
+    app, _, _ = make(tmp_path)
+    entry = {"pageUrl": PAGE, "pageName": "Umsatz", "reportName": "", "slideTitle": "One", "filters": []}
+    selection = {"name": "x", "entries": [entry], "imageArea": {"left": 30, "top": 1, "width": 10, "height": 5}}
+    with TestClient(app) as client:
+        upload(client, sample_template.read_bytes())
+        refused = client.post("/api/export", headers=AUTH, json={"selection": selection})
+    assert refused.status_code == 422 and "outside the slide" in refused.json()["error"]
+
+
 def test_add_current_page_can_take_over_the_set_filters(tmp_path):
     app, _, _ = make(tmp_path)
     with TestClient(app) as client:
