@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, Refused, saveFile } from "./api";
-import { describeFilter, EntryProgress, ExportProgress, MAX_ENTRIES, Selection, TemplateInfo, toJson } from "./types";
+import { describeFilter } from "./filters";
+import { EntryProgress, ExportProgress, MAX_ENTRIES, Selection, TemplateInfo, toJson } from "./types";
 
 const MARK: Record<EntryProgress["state"], string> = {
   waiting: "·",

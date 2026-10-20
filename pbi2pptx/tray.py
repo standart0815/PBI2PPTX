@@ -7,10 +7,13 @@ run on the main thread (macOS requires it); the server runs beside it in its own
 
 from __future__ import annotations
 
+import logging
 import threading
 from typing import Callable
 
 from PIL import Image, ImageDraw
+
+log = logging.getLogger("pbi2pptx.tray")
 
 
 def icon_image(size: int = 64) -> Image.Image:
@@ -30,6 +33,10 @@ def run(on_open: Callable[[], None], on_quit: Callable[[], None], server_thread:
     """Show the icon until the server thread ends (quit from the interface or from this menu)."""
     import pystray  # imported here: it needs a desktop session
 
+    def quit_from_menu() -> None:
+        log.info("Quit from the menu bar icon")  # the interface's Quit logs its own line (app.py)
+        on_quit()
+
     def watch(icon: "pystray.Icon") -> None:  # pystray runs this in its own thread once the icon loop is up
         icon.visible = True
         server_thread.join()
@@ -42,7 +49,7 @@ def run(on_open: Callable[[], None], on_quit: Callable[[], None], server_thread:
         menu=pystray.Menu(
             pystray.MenuItem("Open PBI2PPTX", lambda: on_open(), default=True),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Quit PBI2PPTX", lambda: on_quit()),
+            pystray.MenuItem("Quit PBI2PPTX", lambda: quit_from_menu()),
         ),
     )
     icon.run(setup=watch)

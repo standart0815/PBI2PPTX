@@ -70,7 +70,7 @@ def test_tray_icon_image_is_a_square_with_transparency():
     assert img.getpixel((32, 10)) == (31, 95, 191, 255)  # blue tile
 
 
-def test_quitting_from_the_icon_stops_the_server_and_the_icon(monkeypatch):
+def test_quitting_from_the_icon_stops_the_server_and_the_icon(monkeypatch, caplog):
     """The icon's life follows the server thread: quit from either side ends both."""
     import sys
     import types
@@ -110,8 +110,10 @@ def test_quitting_from_the_icon_stops_the_server_and_the_icon(monkeypatch):
 
     from pbi2pptx import tray
 
-    tray.run(on_open=lambda: None, on_quit=lambda: (events.append("quit"), stop.set()), server_thread=server_thread)
+    with caplog.at_level("INFO", logger="pbi2pptx"):
+        tray.run(on_open=lambda: None, on_quit=lambda: (events.append("quit"), stop.set()), server_thread=server_thread)
     assert events == ["icon shown", "quit", "icon stopped"]
+    assert "Quit from the menu bar icon" in caplog.text  # tells a menu Quit from one in the interface
 
 
 def test_self_test_passes_from_source(capsys, tmp_path, monkeypatch):

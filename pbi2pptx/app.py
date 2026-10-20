@@ -119,8 +119,11 @@ def main(argv=None) -> None:
     server: uvicorn.Server | None = None
 
     def quit_tool() -> None:
-        log.info("Quit from the interface")
         server.should_exit = True
+
+    def quit_from_interface() -> None:
+        log.info("Quit from the interface")
+        quit_tool()
 
     def interface_ready() -> None:
         log.info("PBI2PPTX %s started on port %s (log: %s)", __version__, port, log_file)
@@ -133,7 +136,7 @@ def main(argv=None) -> None:
         WindowService(),
         token,
         allowed_hosts={f"127.0.0.1:{port}", f"localhost:{port}"},
-        on_quit=quit_tool,
+        on_quit=quit_from_interface,
         on_started=interface_ready,
     )
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", log_config=None))

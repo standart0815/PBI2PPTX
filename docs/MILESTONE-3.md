@@ -40,8 +40,9 @@ One process per User, started by the installer's app icon.
 ```
 pbi2pptx/                  Python package
   server.py                local server, token check, progress stream
-  selection.py             Selection, Entry, Filter, Saved Selection JSON (schemaVersion 1)
-  page_url.py              Page URL parsing, App redirect links, URL filter syntax
+  selection.py             Selection, Entry, Saved Selection JSON (schemaVersion 1; 2 with Date Filters)
+  page_url.py              Page URL parsing, App redirect links, Filters and Date Filters in URL filter syntax, Power BI's limits
+  dates.py                 Date Rules, dates on slides in the Render Language
   power_bi_window.py       the Power BI Window: sign-in state, current page, capture
   power_bi_ui.py           selectors and texts for the Power BI interface (the brittle part)
   template.py              .potx handling, layouts, preselection, warnings
@@ -95,6 +96,8 @@ Each step ends with something runnable and tested.
      - Added: one instance at a time, a log file, and a **menu bar / tray icon** with "Open PBI2PPTX" and "Quit". macOS doesn't relaunch a running app, so the icon is the way back to a closed interface tab.
      - Windows: `packaging/windows/pbi2pptx.iss` (Inno Setup, per user, no admin rights) and `build_windows.ps1`. The *Release build* workflow builds both installers. **Not run yet**: it needs the GitHub repository. Not verified on a clean machine either.
      - Still open: the update check (Q54) needs the repository URL. The menu bar icon was confirmed by the user on 2026-10-19: it shows, "Open PBI2PPTX" brings the interface back, and "Quit" stops the app.
+   - **Added after step 7 (2026-10-19), decisions Q60–Q74:** "Add current page" can take over the filters set in the Filter Pane and slicers, and Decks can show a Filter Box. Checked live against the Workspace report: Country and Discount Band were taken over, the date slider was left out with its reason, and the Filter Box was placed right of the page in Firmenvorlage. One part is unverified: reading a shortened Filter Pane list, which has not been seen in a real report yet (`power_bi_ui.FILTER_CARD_CHECKED`).
+   - **Added after step 7 (2026-10-20), decisions Q75–Q91:** Date Filters with fixed dates or Date Rules, the Filter Overview for editing or removing Filters of one field across Entries, and taking over date slicers and date cards. The Export works out Date Rules once at its start, verifies each end of a Date Filter in the Filter Pane, shows the dates on slides and in the notes, and gives Error Slides for ranges that come out empty and for pages over Power BI's limits. Saved Selections with Date Filters use schemaVersion 2. Tested offline against the fake Power BI page; **not yet checked live**: the verification and take-over texts come from the live check of 2026-10-19, but an Export with Date Filters hasn't run against real Power BI. Relative date filters and slicers are matched loosely, as their markup hasn't been seen yet.
 8. **Pilot.**
    - You and 2–3 colleagues, at least one on Windows with Edge, and one who reaches a report **only through a Power BI App**.
    - This closes the accepted risks. Collect problems with the Power BI interface and fix them in `power_bi_ui.py`.

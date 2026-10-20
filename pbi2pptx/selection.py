@@ -3,7 +3,8 @@
 The interface holds the Selection while the User works on it. Reading and writing the Saved
 Selection JSON happens only here, so the Export reads exactly what the User saved.
 
-File format (schemaVersion 1):
+File format (schemaVersion 1, or 2 when an Entry has a Date Filter, so that older versions refuse
+only the files they can't read):
 
     {
       "schemaVersion": 1,
@@ -11,13 +12,17 @@ File format (schemaVersion 1):
       "name": "Monthly pack EMEA",
       "renderLanguage": "de-DE",
       "slideLayout": null,
+      "showFilters": false,            # a Filter Box on slides whose Entry has Filters
       "entries": [
         {
           "pageUrl": "https://app.powerbi.com/groups/…/reports/…/…",
           "pageName": "Example",          # snapshot, for display
           "reportName": "Example",        # snapshot, for display
           "slideTitle": "Example",
-          "filters": [{"table": "financials", "column": "Country", "values": ["Germany"]}]
+          "filters": [
+            {"table": "financials", "column": "Country", "values": ["Germany"]},
+            {"table": "Calendar", "column": "Date", "from": {"rule": "startOfThisYear"}, "to": {"date": "2026-10-19"}}
+          ]
         }
       ]
     }
@@ -29,9 +34,9 @@ import json
 import re
 from dataclasses import dataclass, field
 
-from .page_url import Filter, parse_page_url
+from .page_url import DateFilter, filter_from_json, parse_page_url
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2  # the newest format this version reads and writes
 MAX_ENTRIES = 50
 RENDER_LANGUAGES = ("de-DE", "en-US")
 DEFAULT_NAME = "Untitled Selection"
@@ -47,7 +52,7 @@ class Entry:
     page_name: str
     report_name: str
     slide_title: str
-    filters: list = field(default_factory=list)  # [Filter]
+    filters: list = field(default_factory=list)  # [Filter | DateFilter]
 
     def to_json(self) -> dict:
         return {
@@ -69,7 +74,7 @@ class Entry:
             raise SelectionError(f"{where} has no valid Power BI page address") from None
         page_name = str(data.get("pageName") or "").strip() or page_url.rsplit("/", 1)[-1].split("?")[0]
         try:
-            filters = [Filter.from_json(f) for f in data.get("filters", [])]
+            filters = [filter_from_json(f) for f in data.get("filters", [])]
         except (ValueError, AttributeError) as e:
             raise SelectionError(f"{where}: {e}") from None
         return cls(
@@ -87,14 +92,17 @@ class Selection:
     entries: list = field(default_factory=list)  # [Entry]
     render_language: str = "de-DE"
     slide_layout: str | None = None
+    show_filters: bool = False
 
     def to_json(self) -> dict:
+        dated = any(isinstance(f, DateFilter) for e in self.entries for f in e.filters)
         return {
-            "schemaVersion": SCHEMA_VERSION,
+            "schemaVersion": 2 if dated else 1,
             "app": "PBI2PPTX",
             "name": self.name,
             "renderLanguage": self.render_language,
             "slideLayout": self.slide_layout,
+            "showFilters": self.show_filters,
             "entries": [e.to_json() for e in self.entries],
         }
 
@@ -103,7 +111,7 @@ class Selection:
         if not isinstance(data, dict):
             raise SelectionError("This is not a Saved Selection")
         version = data.get("schemaVersion")
-        if version != SCHEMA_VERSION:
+        if version not in (1, SCHEMA_VERSION):
             if isinstance(version, int) and version > SCHEMA_VERSION:
                 raise SelectionError("This Saved Selection comes from a newer PBI2PPTX. Please update PBI2PPTX.")
             raise SelectionError("This is not a Saved Selection")
@@ -118,6 +126,7 @@ class Selection:
             entries=[Entry.from_json(e, i) for i, e in enumerate(entries, 1)],
             render_language=language if language in RENDER_LANGUAGES else "de-DE",
             slide_layout=(str(data["slideLayout"]).strip() or None) if data.get("slideLayout") else None,
+            show_filters=data.get("showFilters") is True,
         )
 
     # --- The file ----------------------------------------------------------------------------

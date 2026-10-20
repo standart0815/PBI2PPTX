@@ -27,13 +27,25 @@ _Avoid_: tab, section, ReportSection
 **Hidden Page**:
 A Report Page that the report author hid from viewers, such as a tooltip or drill-through page. It is never offered for selection.
 
+**Filter Pane**:
+Power BI's own side panel that lists the filters on a report page. The tool reads it to verify Filters and to take over the filters a User set.
+_Avoid_: filter panel, Filter Box
+
 **Default State**:
 A Report Page as published, without any viewer's slicer selections, personal bookmarks or persisted filters.
 _Avoid_: current state, my view
 
 **Filter**:
-A condition on a report field (table, column, values) entered by the User. It is passed to Power BI in the page address and applied on top of the Default State before the page is captured.
+A condition on a report field (table and column) that is applied on top of the Default State before the page is captured. It is either "is one of these values" or a Date Filter, and it is passed to Power BI in the page address.
 _Avoid_: slicer, bookmark
+
+**Date Filter**:
+A Filter on a date column with a from and/or a to, both inclusive. Each end is a fixed date or a Date Rule.
+_Avoid_: date range filter, period
+
+**Date Rule**:
+A named date that is worked out when the Export runs, such as "Today" or "Start of this month". A Date Filter using one moves along with each Export.
+_Avoid_: relative date, dynamic date, formula
 
 **Power BI Window**:
 The browser window that the tool opens and controls, in which the User signs in to Power BI and browses to the pages they want to add.
@@ -52,6 +64,10 @@ _Avoid_: page list, input list
 **Entry**:
 One item in a Selection: a Page URL, its slide title and its Filters. The same Report Page can appear in several Entries.
 _Avoid_: selected page, item, row
+
+**Filter Overview**:
+The list of all Filters in a Selection, grouped by field, where several Filters of one field can be selected and edited or removed at once.
+_Avoid_: bulk edit, multi-edit, filter list
 
 **Saved Selection**:
 A Selection saved as a JSON file that the User keeps and can load again later. It does not contain the Template.
@@ -88,6 +104,10 @@ _Avoid_: job, conversion, download
 **Deck**:
 The PowerPoint file an Export produces, with one slide per Entry.
 _Avoid_: presentation, PowerPoint, report
+
+**Filter Box**:
+The text box on a slide, to the right of the Page Image, that lists the Entry's Filters. It appears only when the Deck shows Filters on slides and the Entry has Filters.
+_Avoid_: legend, filter panel, filter pane
 
 **Error Slide**:
 The slide that takes the place of an Entry whose Report Page could not be captured: for example, the page was deleted, the User has no access, or Power BI did not apply one of its Filters. It names the page and the reason.

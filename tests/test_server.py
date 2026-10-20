@@ -35,14 +35,21 @@ class FakeService:
     async def sign_out(self):
         self.calls.append("sign_out")
 
-    async def current_page(self):
+    async def current_page(self, include_filters=False):
         if self.failure:
             raise self.failure
-        return CurrentPage(parse_page_url(PAGE), "Umsatz", "Beispielbericht")
+        taken = None
+        if include_filters:
+            from pbi2pptx.page_url import Filter
+            from pbi2pptx.set_filters import LeftOut, TakeOver
+
+            taken = TakeOver([Filter("financials", "Country", ("Germany",))], [LeftOut("Slicer Date", "ranges aren't supported")])
+        return CurrentPage(parse_page_url(PAGE), "Umsatz", "Beispielbericht"), taken
 
     async def check_filters(self, page_url, filters):
         if self.failure:
             raise self.failure
+        self.checked = list(filters)
         applied = filters[0].table == "financials"
         return FilterVerdict(FilterCheck.APPLIED if applied else FilterCheck.NOT_APPLIED, () if applied else tuple(filters))
 
@@ -258,3 +265,30 @@ def test_export_runs_and_the_deck_downloads(tmp_path, sample_template):
     assert deck.status_code == 200 and deck.content[:2] == b"PK"
     assert "filename*=UTF-8''Monthly%20pack%20EMEA%20" in deck.headers["content-disposition"]
     assert "export in en-US" in service.calls
+
+
+def test_add_current_page_can_take_over_the_set_filters(tmp_path):
+    app, _, _ = make(tmp_path)
+    with TestClient(app) as client:
+        plain = client.post("/api/entries/current", headers=AUTH, json={}).json()
+        with_filters = client.post("/api/entries/current", headers=AUTH, json={"includeFilters": True}).json()
+    assert plain["entry"]["filters"] == [] and plain["leftOut"] == []
+    assert with_filters["entry"]["filters"] == [{"table": "financials", "column": "Country", "values": ["Germany"]}]
+    assert with_filters["leftOut"] == [{"what": "Slicer Date", "reason": "ranges aren't supported"}]
+
+
+def test_filter_check_works_out_date_rules_and_refuses_empty_ranges(tmp_path):
+    from datetime import date
+
+    from pbi2pptx.page_url import DateFilter
+
+    app, service, _ = make(tmp_path)
+    year_to_date = {"table": "Calendar", "column": "Date", "from": {"rule": "startOfThisYear"}, "to": {"rule": "today"}}
+    empty = {"table": "Calendar", "column": "Date", "from": {"rule": "today"}, "to": {"rule": "yesterday"}}
+    with TestClient(app) as client:
+        checked = client.post("/api/filters/check", headers=AUTH, json={"pageUrl": PAGE, "filter": year_to_date}).json()
+        refused = client.post("/api/filters/check", headers=AUTH, json={"pageUrl": PAGE, "filter": empty})
+    today = date.today()
+    assert service.checked == [DateFilter("Calendar", "Date", date(today.year, 1, 1), today)]
+    assert checked["result"] == "not applied" and "holds dates" in checked["message"]
+    assert refused.status_code == 422 and "empty today" in refused.json()["error"]

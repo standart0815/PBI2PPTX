@@ -7,12 +7,13 @@ profile (install it once with `uv run playwright install chromium`).
 
 import asyncio
 from contextlib import asynccontextmanager
+from datetime import date
 from pathlib import Path
 
 import pytest
 from PIL import Image, ImageChops
 
-from pbi2pptx.page_url import Filter, ReachedThrough, parse_page_url
+from pbi2pptx.page_url import DateFilter, Filter, ReachedThrough, parse_page_url
 from pbi2pptx.power_bi_window import FilterCheck, FiltersNotApplied, NotAReportPage, PowerBIWindow
 
 FAKE = (Path(__file__).parent / "fixtures" / "fake_power_bi.html").read_text(encoding="utf-8")
@@ -34,8 +35,10 @@ async def _serve_fake(route):
 
 
 @asynccontextmanager
-async def fake_window(tmp_path):
-    window = PowerBIWindow(profile=tmp_path / "profile", browsers=(None,), headless=True, settle_ms=100, overlay_wait_ms=600)
+async def fake_window(tmp_path, language="de-DE"):
+    window = PowerBIWindow(
+        language=language, profile=tmp_path / "profile", browsers=(None,), headless=True, settle_ms=100, overlay_wait_ms=600
+    )
     async with window:
         await window.context.route("https://app.powerbi.com/**", _serve_fake)
         yield window
@@ -238,3 +241,106 @@ def test_check_button_verifies_without_capturing(tmp_path):
     ok, typo = run(check())
     assert ok.check is FilterCheck.APPLIED
     assert typo.check is FilterCheck.NOT_APPLIED and typo.missing == (Filter.parse("financial/Country=Germany"),)
+
+
+def test_reads_the_filters_a_user_set(tmp_path):
+    import json
+
+    pane = [{"table": "financials", "column": "Country", "condition": "ist Germany oder France"}]
+    slicers = [
+        {"column": "Discount Band", "kind": "list", "selectAll": "mixed", "items": [["High", False], ["Low", True], ["Medium", True]]},
+        {"column": "Product", "kind": "dropdown", "text": "Alle"},
+        {"column": "Date", "kind": "range", "available": ["01.01.2013", "31.12.2014"], "selected": ["01.06.2013", "31.12.2013"]},
+        {"column": "Region", "kind": "list", "selectAll": "mixed", "items": [["EMEA", True], ["APAC", False]]},
+        {"column": "Order Date", "kind": "other"},
+    ]
+
+    async def check():
+        async with fake_window(tmp_path) as w:
+            await w.open_home()
+            await w.page.evaluate(
+                "([p, s]) => { localStorage.setItem('fake-pane-filters', p); localStorage.setItem('fake-slicers', s); }",
+                [json.dumps(pane), json.dumps(slicers)],
+            )
+            await w.page.goto(parse_page_url(WS_PAGE).with_filters([Filter.parse("financials/Segment=Government")]))
+            await w._wait_until_rendered()
+            result = await w.read_set_filters()
+            return result, await w.page.locator("filter-pane-modern").count()
+
+    result, pane_left_open = run(check())
+    assert result.filters == [
+        Filter("financials", "Segment", ("Government",)),  # the page address's own Filter shows as a card too
+        Filter("financials", "Country", ("Germany", "France")),
+        Filter("financials", "Discount Band", ("Low", "Medium")),  # table from the "Discount Band" card
+        DateFilter("Calendar", "Date", date(2013, 6, 1), date(2013, 12, 31)),  # the date slicer, table from the "Date" card
+    ]
+    assert {lo.what: lo.reason for lo in result.left_out} == {
+        "Slicer Region = EMEA": "table unknown: add this Filter by hand",
+        "Slicer Order Date": "this kind of slicer isn't supported (such as relative dates)",
+    }
+    assert pane_left_open == 0
+
+
+def test_a_shortened_card_is_opened_and_read(tmp_path):
+    import json
+
+    pane = [{"table": "financials", "column": "Country", "condition": "ist Germany, France und 1 weitere", "ticked": ["Germany", "France", "Mexico"]}]
+
+    async def check():
+        async with fake_window(tmp_path) as w:
+            await w.open_home()
+            await w.page.evaluate("p => localStorage.setItem('fake-pane-filters', p)", json.dumps(pane))
+            await w.page.goto(WS_PAGE)
+            await w._wait_until_rendered()
+            return await w.read_set_filters()
+
+    assert run(check()).filters == [Filter("financials", "Country", ("Germany", "France", "Mexico"))]
+
+
+@pytest.mark.parametrize("language", ["de-DE", "en-US"])
+def test_date_filters_are_verified_by_a_card_for_each_end(tmp_path, language):
+    # Power BI shows "ist am oder nach 01.06.2013" and "ist vor 01.01.2014" ("is on or after 6/1/2013", "is before 1/1/2014").
+    second_half = DateFilter("Calendar", "Date", date(2013, 6, 1), date(2013, 12, 31))
+    wrong_table = DateFilter("Kalender", "Date", start=date(2013, 6, 1))
+
+    async def check():
+        async with fake_window(tmp_path, language) as w:
+            applied = await w.check_filters(parse_page_url(WS_PAGE), [second_half])
+            ignored = await w.check_filters(parse_page_url(WS_PAGE), [wrong_table])
+            return applied, ignored
+
+    applied, ignored = run(check())
+    assert applied.check is FilterCheck.APPLIED
+    assert ignored.check is FilterCheck.NOT_APPLIED and ignored.missing == (wrong_table,)
+
+
+def test_a_date_range_from_the_page_address_is_taken_over(tmp_path):
+    import json
+
+    # Power BI narrows the date slicer to the address's range, so the slicer only mirrors the cards.
+    slicers = [{"column": "Date", "kind": "range", "available": ["6/1/2013", "12/31/2013"], "selected": ["6/1/2013", "12/31/2013"]}]
+    second_half = DateFilter("Calendar", "Date", date(2013, 6, 1), date(2013, 12, 31))
+
+    async def check():
+        async with fake_window(tmp_path, "en-US") as w:
+            await w.open_home()
+            await w.page.evaluate("s => localStorage.setItem('fake-slicers', s)", json.dumps(slicers))
+            await w.page.goto(parse_page_url(WS_PAGE).with_filters([second_half]))
+            await w._wait_until_rendered()
+            return await w.read_set_filters()
+
+    result = run(check())
+    assert result.filters == [second_half] and result.left_out == []
+
+
+@pytest.mark.parametrize("language", ["de-DE", "en-US"])
+def test_a_midnight_time_on_date_cards_still_verifies(tmp_path, language):
+    second_half = DateFilter("Calendar", "Date", date(2013, 6, 1), date(2013, 12, 31))
+
+    async def check():
+        async with fake_window(tmp_path, language) as w:
+            await w.open_home()
+            await w.page.evaluate("() => localStorage.setItem('fake-date-time', '1')")
+            return await w.check_filters(parse_page_url(WS_PAGE), [second_half])
+
+    assert run(check()).check is FilterCheck.APPLIED

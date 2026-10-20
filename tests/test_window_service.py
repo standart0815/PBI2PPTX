@@ -87,7 +87,8 @@ def test_add_current_page_and_paste_an_app_link(tmp_path):
             with pytest.raises(NotAReportPage):  # the window starts at Power BI's home page
                 await service.current_page()
             await service._window.page.goto(WS_PAGE)
-            current = await service.current_page()
+            current, taken = await service.current_page(include_filters=True)
+            assert taken.filters == [] and taken.left_out == []
             pasted = await service.resolve(APP_LINK)
         finally:
             await service.stop()

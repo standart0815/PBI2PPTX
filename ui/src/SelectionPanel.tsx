@@ -1,9 +1,21 @@
 import { FormEvent, useRef, useState } from "react";
 import { api, Refused, saveFile } from "./api";
 import { EntryItem } from "./EntryItem";
-import { Entry, EntryJson, Filter, MAX_ENTRIES, sameFilter, Selection, toJson, withId } from "./types";
+import { FilterOverview } from "./FilterOverview";
+import { sameFilter } from "./filters";
+import { Entry, EntryJson, Filter, LeftOut, MAX_ENTRIES, Selection, toJson, withId } from "./types";
 
-type Notice = { kind: "info" | "problem"; text: string } | null;
+type Notice = { kind: "info" | "problem"; text: string; leftOut?: LeftOut[] } | null;
+
+// "Include the filters I set" is a per-browser convenience; on unless the User turned it off.
+const INCLUDE_KEY = "pbi2pptx-include-filters";
+function loadInclude(): boolean {
+  try {
+    return localStorage.getItem(INCLUDE_KEY) !== "off";
+  } catch {
+    return true;
+  }
+}
 
 export function SelectionPanel({
   selection,
@@ -22,6 +34,7 @@ export function SelectionPanel({
   const [address, setAddress] = useState("");
   const [dragged, setDragged] = useState<number | null>(null);
   const [over, setOver] = useState<number | null>(null);
+  const [includeFilters, setIncludeFilters] = useState(loadInclude);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const entries = selection.entries;
@@ -39,12 +52,28 @@ export function SelectionPanel({
     }
   }
 
-  function append(entry: EntryJson) {
+  function append(entry: EntryJson, leftOut: LeftOut[] = []) {
     setSelection((s) => ({ ...s, entries: [...s.entries, withId(entry)] }));
-    setNotice({ kind: "info", text: `Added "${entry.pageName}"${entry.reportName ? ` from ${entry.reportName}` : ""}.` });
+    const from = entry.reportName ? ` from ${entry.reportName}` : "";
+    const count = entry.filters.length;
+    const filters = count ? ` with ${count} Filter${count === 1 ? "" : "s"}` : "";
+    setNotice({ kind: "info", text: `Added "${entry.pageName}"${from}${filters}.`, leftOut });
   }
 
-  const addCurrentPage = () => attempt(async () => append((await api.addCurrentPage()).entry));
+  const addCurrentPage = () =>
+    attempt(async () => {
+      const { entry, leftOut } = await api.addCurrentPage(includeFilters);
+      append(entry, leftOut);
+    });
+
+  const toggleInclude = (on: boolean) => {
+    setIncludeFilters(on);
+    try {
+      localStorage.setItem(INCLUDE_KEY, on ? "on" : "off");
+    } catch {
+      // storage unavailable: the choice lasts until the tab is reloaded
+    }
+  };
 
   const addByAddress = (event: FormEvent) => {
     event.preventDefault();
@@ -102,7 +131,13 @@ export function SelectionPanel({
 
   const startNew = () => {
     if (entries.length && !window.confirm("Start a new Selection? Unsaved changes are lost.")) return;
-    setSelection(() => ({ name: "Untitled Selection", renderLanguage: selection.renderLanguage, slideLayout: null, entries: [] }));
+    setSelection(() => ({
+      name: "Untitled Selection",
+      renderLanguage: selection.renderLanguage,
+      slideLayout: null,
+      showFilters: selection.showFilters ?? false,
+      entries: [],
+    }));
     setNotice(null);
   };
 
@@ -146,6 +181,10 @@ export function SelectionPanel({
         <button type="button" disabled={busy || !ready || full || locked} onClick={addCurrentPage}>
           {busy ? "Working…" : "Add current page"}
         </button>
+        <label className="toggle small">
+          <input type="checkbox" checked={includeFilters} onChange={(e) => toggleInclude(e.target.checked)} />
+          Include the filters I set
+        </label>
         <button type="button" className="quiet" disabled={busy || !ready || full || locked} onClick={() => setPasting(!pasting)}>
           Paste address
         </button>
@@ -173,6 +212,18 @@ export function SelectionPanel({
       )}
 
       {notice && <p className={notice.kind === "problem" ? "error" : "info"}>{notice.text}</p>}
+      {notice?.leftOut && notice.leftOut.length > 0 && (
+        <div className="left-out small">
+          <p>Not taken over:</p>
+          <ul>
+            {notice.leftOut.map((lo, i) => (
+              <li key={i}>
+                <strong>{lo.what}</strong>: {lo.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {entries.length === 0 ? (
         <p className="muted empty">
@@ -213,6 +264,10 @@ export function SelectionPanel({
             />
           ))}
         </ol>
+      )}
+
+      {entries.some((e) => e.filters.length > 0) && (
+        <FilterOverview entries={entries} onChange={(next) => setSelection((s) => ({ ...s, entries: next }))} />
       )}
     </section>
   );
