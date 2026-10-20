@@ -81,6 +81,10 @@ Each Entry shows its page, its report, and how you reach it (Workspace, My works
 - **Order:** drag an Entry by its handle (⋮⋮), or use **↑** and **↓**.
 - **Duplicate:** puts a copy right below, so you can include the same page twice, for example with different Filters.
 - **Remove:** takes the Entry out.
+- **Open:** shows the Entry's page in the Power BI Window, without Filters, for a quick look.
+- **Open with Filters** (only on Entries with Filters): shows the page with the Entry's Filters, with Date Rules worked out for today. The page is not reset, so your own slicer selections may still show there; the slide will show the page reset to its default state. To check whether Power BI accepts a Filter, use **Check** in the Filter editor.
+
+Both are unavailable while an Export runs.
 
 ### Filters
 

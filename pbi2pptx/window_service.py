@@ -113,6 +113,11 @@ class WindowService:
             await window.page.bring_to_front()
             return await window.resolve(address)
 
+    async def show_page(self, page_url: PageUrl, filters: Sequence[Filter]) -> None:
+        """For an Entry's "Open" links: show its page in the Power BI Window, with or without its Filters."""
+        async with self._quick_lock():
+            await self._open_window().show_page(page_url, filters)
+
     async def check_filters(self, page_url: PageUrl, filters: Sequence[Filter]) -> FilterVerdict:
         """For the "Check" button: does Power BI apply these Filters on this page?"""
         async with self._quick_lock():

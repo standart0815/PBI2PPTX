@@ -256,6 +256,22 @@ def create_app(
                 log.warning("Could not save the settings to %s", settings_file)
         return JSONResponse({"settings": settings})
 
+    async def open_page(request: Request) -> Response:
+        body = await json_body(request)
+        try:
+            page_url = parse_page_url(str(body.get("pageUrl", "")))
+            filters = [filter_from_json(f).on(date.today()) for f in body.get("filters") or []]
+        except (ValueError, AttributeError):
+            return problem(422, "Opening a page needs its address and complete Filters.")
+        for flt in filters:
+            if isinstance(flt, DateFilter) and flt.empty:
+                return problem(422, f"This date range is empty today: from {flt.start:%Y-%m-%d} is after to {flt.end:%Y-%m-%d}.")
+        try:
+            await service.show_page(page_url, filters)
+        except (WindowNotOpen, Busy) as e:
+            return problem(409, str(e))
+        return JSONResponse({"ok": True})
+
     async def start_export(request: Request) -> Response:
         try:
             body = await json_body(request)
@@ -312,6 +328,7 @@ def create_app(
         Route("/api/selection/open", api(open_selection), methods=["POST"]),
         Route("/api/selection/save", api(save_selection), methods=["POST"]),
         Route("/api/filters/check", api(check_filter), methods=["POST"]),
+        Route("/api/page/open", api(open_page), methods=["POST"]),
         Route("/api/export", api(export_progress)),
         Route("/api/export", api(start_export), methods=["POST"]),
         Route("/api/export/cancel", api(cancel_export), methods=["POST"]),

@@ -79,6 +79,7 @@ export const api = {
   openSelection: (content: string) => call<{ selection: SelectionJson }>("/api/selection/open", "POST", { content }),
   getTemplate: () => call<{ template: TemplateInfo | null }>("/api/template"),
   uploadTemplate: (file: File) => call<{ template: TemplateInfo }>("/api/template", "POST", file),
+  openPage: (pageUrl: string, filters: Filter[] = []) => call("/api/page/open", "POST", { pageUrl, filters }),
   checkFilter: (pageUrl: string, filter: Filter) => call<FilterCheckResult>("/api/filters/check", "POST", { pageUrl, filter }),
   startExport: (selection: SelectionJson, hidden: boolean) => call("/api/export", "POST", { selection, hidden }),
   getSettings: () => call<{ settings: Settings }>("/api/settings"),
