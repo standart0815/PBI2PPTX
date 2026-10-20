@@ -114,7 +114,19 @@ def test_quitting_from_the_icon_stops_the_server_and_the_icon(monkeypatch):
     assert events == ["icon shown", "quit", "icon stopped"]
 
 
-def test_self_test_passes_from_source(capsys):
+def test_self_test_passes_from_source(capsys, tmp_path, monkeypatch):
+    import pbi2pptx
     from pbi2pptx.self_test import run
 
+    (tmp_path / "index.html").write_text("<!doctype html>")  # CI's test job doesn't build the interface
+    monkeypatch.setattr(pbi2pptx, "static_dir", lambda: tmp_path)
     assert run() == 0, capsys.readouterr().err
+
+
+def test_self_test_fails_without_the_interface(capsys, tmp_path, monkeypatch):
+    import pbi2pptx
+    from pbi2pptx.self_test import run
+
+    monkeypatch.setattr(pbi2pptx, "static_dir", lambda: tmp_path)
+    assert run() == 1
+    assert "interface missing" in capsys.readouterr().err
