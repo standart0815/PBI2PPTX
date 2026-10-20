@@ -1,6 +1,6 @@
 # Starting and using PBI2PPTX
 
-This manual covers version 0.1.0, which is still in development. It starts, signs you in to Power BI, and lets you build, save and reopen a Selection of pages. **Choosing a Template and exporting the Deck come in the next versions** (Milestone 3, steps 5–6). Until the installers exist (step 7), you start it from the project folder with a command.
+This manual covers version 0.1.0, which is still in development. It starts, signs you in to Power BI, lets you build, save and reopen a Selection of pages, and lets you choose the Template, Slide Layout and Render Language. **Exporting the Deck comes in the next version** (Milestone 3, step 6). Until the installers exist (step 7), you start it from the project folder with a command.
 
 Terms such as *Power BI Window*, *Selection* and *Deck* are explained in [GLOSSARY.md](../GLOSSARY.md).
 
@@ -104,6 +104,27 @@ Power BI doesn't report Filter mistakes, so check the slides:
 A Saved Selection holds the page addresses, titles and Filters, but no report data. A colleague can open your file; pages they can't access will fail at export.
 
 The Selection also survives a reload of the interface tab. **Quit** and closing the tab don't keep it, so save first.
+
+## Template & settings
+
+### Choosing the Template
+
+Click **Choose template…** and pick your company's PowerPoint template (`.potx`). A presentation (`.pptx`) also works. The panel then shows the file name and the slide size.
+
+- **The template's own slides are left out.** Example slides such as a title slide or "Thank you" don't go into the Deck, only your pages do. The panel says how many there are.
+- **The Template isn't stored anywhere.** PBI2PPTX keeps it in memory while it runs, so after a restart you choose it again. A Saved Selection remembers the Slide Layout's name, but not the file.
+
+### Choosing the Slide Layout
+
+Every page slide uses the same layout from the Template. PBI2PPTX recommends one: the layout with the largest picture area that no graphic reaches into. You can choose any other.
+
+- **⚠ "A graphic reaches into the picture area"** means the layout has a picture or shape, such as an illustration, where your pages would go. Pages may collide with it. The sketch shows it in red.
+- **The sketch** shows the chosen layout: title and footers in grey, the picture area dashed. Pages go into the picture area as large as possible, anchored top left, and never cover the title or footers.
+- If a Saved Selection asks for a layout this Template doesn't have, PBI2PPTX uses the recommended one and says so.
+
+### Render Language
+
+Chooses how numbers and dates appear in the pages: **Deutsch** (`1.234,56`, `31.12.2026`) or **English** (`1,234.56`, `12/31/2026`). Texts stored in the report data, such as month names in a column, stay as they are.
 
 ## Options
 

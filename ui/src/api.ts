@@ -1,7 +1,7 @@
 // Talks to the local server (pbi2pptx/server.py). The per-launch token comes from the
 // address the tool opened, and goes with every API call.
 
-import type { EntryJson, SelectionJson } from "./types";
+import type { EntryJson, SelectionJson, TemplateInfo } from "./types";
 
 const token = new URLSearchParams(window.location.search).get("token") ?? "";
 
@@ -19,12 +19,20 @@ export class NotRunning extends Error {}
 export class Refused extends Error {}
 
 async function call<T>(path: string, method: "GET" | "POST" = "GET", body?: unknown): Promise<T> {
+  const isFile = body instanceof File;
   let response: Response;
   try {
     response = await fetch(path, {
       method,
-      headers: { "X-PBI2PPTX-Token": token, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      headers: {
+        "X-PBI2PPTX-Token": token,
+        ...(body === undefined
+          ? {}
+          : isFile
+            ? { "Content-Type": "application/octet-stream", "X-File-Name": encodeURIComponent(body.name) }
+            : { "Content-Type": "application/json" }),
+      },
+      body: body === undefined ? undefined : isFile ? body : JSON.stringify(body),
     });
   } catch {
     throw new NotRunning("PBI2PPTX isn't running");
@@ -42,6 +50,8 @@ export const api = {
   addCurrentPage: () => call<{ entry: EntryJson }>("/api/entries/current", "POST"),
   addByAddress: (address: string) => call<{ entry: EntryJson }>("/api/entries/resolve", "POST", { address }),
   openSelection: (content: string) => call<{ selection: SelectionJson }>("/api/selection/open", "POST", { content }),
+  getTemplate: () => call<{ template: TemplateInfo | null }>("/api/template"),
+  uploadTemplate: (file: File) => call<{ template: TemplateInfo }>("/api/template", "POST", file),
   saveSelection: (selection: SelectionJson) =>
     call<{ fileName: string; content: string }>("/api/selection/save", "POST", { selection }),
 };

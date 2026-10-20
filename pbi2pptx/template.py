@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import io
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import List, Optional
 
@@ -39,10 +39,17 @@ def _swap_main_content_type(data: bytes, old: str, new: str) -> bytes:
     return out.getvalue()
 
 
-def open_template(path: Path):
-    """Open a .potx (or .pptx) as an editable Presentation."""
-    data = Path(path).read_bytes()
-    return Presentation(io.BytesIO(_swap_main_content_type(data, _CT_TEMPLATE, _CT_PRESENTATION)))
+class NotATemplate(ValueError):
+    """The file can't be read as a PowerPoint template."""
+
+
+def open_template(source: Path | bytes):
+    """Open a .potx (or .pptx), from a path or from its bytes, as an editable Presentation."""
+    data = source if isinstance(source, bytes) else Path(source).read_bytes()
+    try:
+        return Presentation(io.BytesIO(_swap_main_content_type(data, _CT_TEMPLATE, _CT_PRESENTATION)))
+    except Exception as e:  # zipfile.BadZipFile, KeyError, lxml errors, python-pptx ValueError
+        raise NotATemplate("This isn't a PowerPoint template (.potx or .pptx)") from e
 
 
 def save_as_potx(prs, path: Path) -> None:
@@ -140,33 +147,64 @@ class LayoutInfo:
 
     name: str
     image_area: Optional[Box]  # None: the layout can't hold a page slide
-    decorative_graphics: tuple  # names of graphics inside the Image Area; non-empty means a warning
+    graphics: tuple = ()  # (name, Box) of Decorative Graphics inside the Image Area; non-empty means a warning
+    title: Optional[Box] = None
+    footers: tuple = ()  # Box of each footer placeholder
     preselected: bool = False
 
     @property
     def usable(self) -> bool:
         return self.image_area is not None
 
+    @property
+    def decorative_graphics(self) -> tuple:
+        return tuple(name for name, _ in self.graphics)
+
+
+def _describe(layout, slide_width: int, slide_height: int) -> LayoutInfo:
+    titles = [ph for ph in layout.placeholders if placeholder_type(ph) in TITLE_TYPES]
+    footers = tuple(Box.of(ph) for ph in layout.placeholders if placeholder_type(ph) in FOOTER_TYPES)
+    title = Box.of(titles[0]) if titles else None
+    if title is None:
+        return LayoutInfo(layout.name, None, footers=footers)
+    try:
+        area = image_area(layout, slide_width, slide_height)
+    except ValueError:
+        return LayoutInfo(layout.name, None, title=title, footers=footers)
+    shapes = [*layout.slide_master.shapes, *layout.shapes]
+    graphics = tuple((s.name, Box.of(s)) for s in shapes if not s.is_placeholder and area.overlaps(Box.of(s)))
+    return LayoutInfo(layout.name, area, graphics, title, footers)
+
 
 def describe_layouts(prs) -> List[LayoutInfo]:
     """Every Slide Layout, with its Image Area, warnings and which one is preselected."""
-    infos = []
-    for layout in prs.slide_layouts:
-        area, graphics = None, ()
-        if has_title(layout):
-            try:
-                area = image_area(layout, prs.slide_width, prs.slide_height)
-                graphics = tuple(decorative_graphics_in_image_area(layout, prs.slide_width, prs.slide_height))
-            except ValueError:
-                area = None
-        infos.append(LayoutInfo(layout.name, area, graphics))
-
+    infos = [_describe(layout, prs.slide_width, prs.slide_height) for layout in prs.slide_layouts]
     # Preselection: the largest Image Area that no Decorative Graphic reaches into; the first wins a tie.
-    candidates = [i for i in infos if i.usable and not i.decorative_graphics]
+    candidates = [i for i in infos if i.usable and not i.graphics]
     if not candidates:
         return infos
     best = max(candidates, key=lambda i: (i.image_area.size, -infos.index(i)))
-    return [LayoutInfo(i.name, i.image_area, i.decorative_graphics, i is best) for i in infos]
+    return [replace(i, preselected=i is best) for i in infos]
+
+
+@dataclass(frozen=True)
+class TemplateInfo:
+    """A Template as the interface shows it."""
+
+    file_name: str
+    slide_width: int
+    slide_height: int
+    template_slides: int  # example slides in the Template; the Deck leaves them out
+    layouts: tuple  # (LayoutInfo, …)
+
+    @property
+    def preselected(self) -> Optional[str]:
+        return next((i.name for i in self.layouts if i.preselected), None)
+
+
+def describe_template(source: Path | bytes, file_name: str) -> TemplateInfo:
+    prs = open_template(source)
+    return TemplateInfo(file_name, int(prs.slide_width), int(prs.slide_height), len(prs.slides), tuple(describe_layouts(prs)))
 
 
 def preselected_layout(prs):

@@ -132,3 +132,29 @@ button.link { background: none; border: none; color: var(--accent); padding: 0 0
   .filters { margin-left: 0; }
   .count { margin-left: 0; width: 100%; }
 }
+
+/* --- Template & settings ---------------------------------------------------------------- */
+:root { --area: rgba(31, 95, 191, 0.10); --graphic: rgba(192, 57, 43, 0.55); --shape: rgba(102, 102, 95, 0.25); }
+@media (prefers-color-scheme: dark) {
+  :root { --area: rgba(110, 163, 240, 0.14); --graphic: rgba(239, 122, 108, 0.6); --shape: rgba(163, 162, 154, 0.25); }
+}
+.template-file { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; margin-top: 0.75rem; }
+.template-file p { margin: 0; }
+.warning { color: var(--attention); display: block; }
+fieldset { border: none; padding: 0; margin: 1rem 0 0; min-width: 0; }
+legend { font-weight: 600; margin-bottom: 0.4rem; padding: 0; }
+.layout-choice { display: flex; flex-wrap: wrap; gap: 1rem; align-items: flex-start; }
+.layouts { flex: 1 1 18rem; }
+.layout-option { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.35rem 0.5rem; border-radius: 6px; cursor: pointer; }
+.layout-option.chosen { background: var(--bg); }
+.layout-option input { margin-top: 0.3rem; flex: none; }
+.layout-text { display: flex; flex-direction: column; }
+.badge { margin-left: 0.5rem; font-size: 0.75rem; color: var(--ok); border: 1px solid var(--ok); border-radius: 999px; padding: 0 0.45rem; }
+.sketch { flex: 0 1 20rem; margin: 1.6rem 0 0; }
+.sketch svg { width: 100%; height: auto; display: block; }
+.sk-slide { fill: var(--surface); stroke: var(--border); }
+.sk-title, .sk-footer { fill: var(--shape); }
+.sk-area { fill: var(--area); stroke: var(--accent); stroke-dasharray: 4 3; }
+.sk-graphic { fill: var(--graphic); }
+.languages { display: flex; flex-direction: column; gap: 0.25rem; }
+.language-option { display: flex; gap: 0.5rem; align-items: baseline; cursor: pointer; }

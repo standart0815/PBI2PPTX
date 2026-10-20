@@ -102,7 +102,7 @@ def _notes(entry: CapturedEntry, labels: dict, exported_at: datetime) -> str:
 
 
 def build_deck(
-    template: Path,
+    template: Path | bytes,
     entries: List[CapturedEntry],
     out: Path,
     layout_name: Optional[str] = None,

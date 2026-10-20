@@ -152,3 +152,37 @@ def test_save_and_open_a_selection(tmp_path):
     assert saved["fileName"] == "Monthly pack EMEA.json"
     assert opened["entries"] == selection["entries"] and opened["renderLanguage"] == "en-US"
     assert broken.status_code == 422 and "not valid JSON" in broken.json()["error"]
+
+
+def upload(client, data: bytes, name="Firmen Vorlage.potx"):
+    from urllib.parse import quote
+
+    from pbi2pptx.server import FILE_NAME_HEADER
+
+    return client.post("/api/template", headers={**AUTH, FILE_NAME_HEADER: quote(name)}, content=data)
+
+
+def test_upload_a_template_and_read_it_back(tmp_path, sample_template):
+    app, _, _ = make(tmp_path)
+    with TestClient(app) as client:
+        assert client.get("/api/template", headers=AUTH).json() == {"template": None}
+        info = upload(client, sample_template.read_bytes()).json()["template"]
+        again = client.get("/api/template", headers=AUTH).json()["template"]
+    assert info == again
+    assert (info["fileName"], info["slideWidthCm"], info["templateSlides"], info["preselected"]) == ("Firmen Vorlage.potx", 33.9, 1, "PBI Page")
+    page = next(l for l in info["layouts"] if l["name"] == "PBI Page")
+    area = page["imageArea"]
+    assert area["x"] == 0 and area["w"] == 1  # full slide width
+    assert 0 < area["y"] < area["y"] + area["h"] < 1
+    assert app.state.session["template"]["data"] == sample_template.read_bytes()  # kept for the Export
+
+
+def test_refuses_what_is_not_a_template(tmp_path):
+    app, _, _ = make(tmp_path)
+    with TestClient(app) as client:
+        refused = upload(client, b"%PDF-1.7 not a template", "report.pdf")
+        too_big = client.post("/api/template", headers={**AUTH, "content-length": str(200 * 1024 * 1024)}, content=b"x")
+        still_none = client.get("/api/template", headers=AUTH).json()
+    assert refused.status_code == 422 and "isn't a PowerPoint template" in refused.json()["error"]
+    assert too_big.status_code == 413
+    assert still_none == {"template": None}

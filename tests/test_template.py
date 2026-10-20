@@ -11,7 +11,7 @@ from pbi2pptx.template import (
     open_template,
     preselected_layout,
 )
-from tests.fixtures.samples import FOOTER_TOP, HEADER_BOTTOM, SLIDE_W, band
+from tests.fixtures.samples import FOOTER_TOP, HEADER_BOTTOM, MARGIN, SLIDE_W, TITLE_TOP, band
 
 
 def _layout(template, name):
@@ -74,3 +74,33 @@ def test_decorative_graphic_inside_image_area_is_reported_and_avoided(sample_tem
 def test_unknown_layout_lists_available_names(sample_template):
     with pytest.raises(ValueError, match="PBI Page"):
         layout_by_name(open_template(sample_template), "Nope")
+
+
+def test_describes_a_template_from_its_bytes(sample_template):
+    from pbi2pptx.template import describe_template
+
+    info = describe_template(sample_template.read_bytes(), "Sample.potx")
+    assert (info.file_name, info.template_slides, info.preselected) == ("Sample.potx", 1, "PBI Page")
+    page = next(i for i in info.layouts if i.name == "PBI Page")
+    assert page.title == Box(int(MARGIN), int(TITLE_TOP), int(SLIDE_W - 2 * MARGIN), int(HEADER_BOTTOM - TITLE_TOP))
+    assert len(page.footers) == 3 and page.graphics == ()
+
+
+def test_graphics_in_the_image_area_carry_their_boxes(sample_template):
+    from pbi2pptx.template import describe_layouts
+
+    prs, layout = _layout(sample_template, "PBI Page")
+    layout.shapes._spTree.append(band(SLIDE_W // 2, HEADER_BOTTOM * 2, SLIDE_W // 4, HEADER_BOTTOM, "FF0000", 951))
+    info = next(i for i in describe_layouts(prs) if i.name == "PBI Page")
+    ((name, box),) = info.graphics
+    assert name == "Header band 951" and box.left == SLIDE_W // 2
+    assert info.decorative_graphics == ("Header band 951",)
+
+
+def test_refuses_files_that_are_not_templates(tmp_path):
+    from pbi2pptx.template import NotATemplate
+
+    with pytest.raises(NotATemplate):
+        open_template(b"PK\x03\x04 not really a zip")
+    with pytest.raises(NotATemplate):
+        open_template(b"%PDF-1.7")

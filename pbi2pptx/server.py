@@ -12,6 +12,7 @@ import contextlib
 import secrets
 from pathlib import Path
 from typing import Callable, Iterable
+from urllib.parse import unquote
 
 from starlette.applications import Starlette
 from starlette.requests import Request
@@ -22,9 +23,13 @@ from starlette.staticfiles import StaticFiles
 from . import __version__
 from .power_bi_window import CurrentPage, NotAReportPage
 from .selection import Entry, Selection, SelectionError
+from .template import Box, NotATemplate, TemplateInfo, describe_template
 from .window_service import WindowNotOpen, WindowService
 
 TOKEN_HEADER = "X-PBI2PPTX-Token"
+FILE_NAME_HEADER = "X-File-Name"
+MAX_TEMPLATE_BYTES = 100 * 1024 * 1024
+EMU_PER_CM = 360_000
 STATIC = Path(__file__).parent / "static"  # the built interface (ui/, `npm run build`)
 
 NOT_BUILT = """<!doctype html><meta charset="utf-8"><title>PBI2PPTX</title>
@@ -47,6 +52,36 @@ async def json_body(request: Request) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+def template_json(info: TemplateInfo) -> dict:
+    """Layout geometry as fractions of the slide, so the interface can draw it at any size."""
+    w, h = info.slide_width, info.slide_height
+
+    def rel(box: Box | None) -> dict | None:
+        if box is None:
+            return None
+        return {"x": box.left / w, "y": box.top / h, "w": box.width / w, "h": box.height / h}
+
+    return {
+        "fileName": info.file_name,
+        "slideWidthCm": round(w / EMU_PER_CM, 1),
+        "slideHeightCm": round(h / EMU_PER_CM, 1),
+        "templateSlides": info.template_slides,
+        "preselected": info.preselected,
+        "layouts": [
+            {
+                "name": i.name,
+                "usable": i.usable,
+                "preselected": i.preselected,
+                "imageArea": rel(i.image_area),
+                "title": rel(i.title),
+                "footers": [rel(b) for b in i.footers],
+                "graphics": [{"name": name, **rel(box)} for name, box in i.graphics],
+            }
+            for i in info.layouts
+        ],
+    }
+
+
 def create_app(
     service: WindowService,
     token: str,
@@ -56,6 +91,8 @@ def create_app(
     static_dir: Path = STATIC,
 ) -> Starlette:
     allowed = set(allowed_hosts)
+    # The Template the User picked: in memory only, for the Export (ADR 0003: nothing stored).
+    template: dict = {}
 
     def guard(request: Request, needs_token: bool) -> Response | None:
         if request.headers.get("host", "") not in allowed:
@@ -127,6 +164,25 @@ def create_app(
             return problem(422, str(e))
         return JSONResponse({"fileName": selection.file_name(), "content": selection.dumps()})
 
+    async def get_template(request: Request) -> Response:
+        return JSONResponse({"template": template_json(template["info"]) if template else None})
+
+    async def put_template(request: Request) -> Response:
+        if int(request.headers.get("content-length") or 0) > MAX_TEMPLATE_BYTES:
+            return problem(413, "This file is too large for a template (more than 100 MB).")
+        data = await request.body()
+        if len(data) > MAX_TEMPLATE_BYTES:
+            return problem(413, "This file is too large for a template (more than 100 MB).")
+        name = unquote(request.headers.get(FILE_NAME_HEADER, "")).strip() or "Template.potx"
+        try:
+            info = describe_template(data, name)
+        except NotATemplate as e:
+            return problem(422, str(e))
+        if not any(i.usable for i in info.layouts):
+            return problem(422, "This template has no slide layout with a title, so there is nowhere to put the pages.")
+        template.update(data=data, info=info)
+        return JSONResponse({"template": template_json(info)})
+
     async def quit_tool(request: Request) -> Response:
         on_quit()
         return JSONResponse({"ok": True})
@@ -143,6 +199,7 @@ def create_app(
                 await opening
             await service.stop()
 
+    app_state = {"template": template}  # read by the Export (step 6)
     routes = [
         Route("/", index),
         Route("/api/status", api(status)),
@@ -152,8 +209,12 @@ def create_app(
         Route("/api/entries/resolve", api(add_by_address), methods=["POST"]),
         Route("/api/selection/open", api(open_selection), methods=["POST"]),
         Route("/api/selection/save", api(save_selection), methods=["POST"]),
+        Route("/api/template", api(get_template)),
+        Route("/api/template", api(put_template), methods=["POST"]),
         Route("/api/quit", api(quit_tool), methods=["POST"]),
     ]
     if (static_dir / "assets").is_dir():
         routes.append(Mount("/assets", StaticFiles(directory=static_dir / "assets")))
-    return Starlette(routes=routes, lifespan=lifespan)
+    app = Starlette(routes=routes, lifespan=lifespan)
+    app.state.session = app_state
+    return app
