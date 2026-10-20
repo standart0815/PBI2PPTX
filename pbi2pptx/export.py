@@ -186,7 +186,10 @@ class Exporter:
                     progress.phase = "Building the Deck"
                     file_name = f"{safe_file_name(selection.name)} {today.isoformat()}.pptx"
                     out = Path(folder) / file_name
-                    await asyncio.to_thread(build_deck, template, captured, out, selection.slide_layout, language)
+                    custom_area = selection.image_area.box() if selection.image_area else None
+                    await asyncio.to_thread(
+                        build_deck, template, captured, out, selection.slide_layout, language, custom_area=custom_area
+                    )
                     self._deck, self._deck_made = out.read_bytes(), time.monotonic()
             progress.state, progress.phase, progress.file_name = ExportState.DONE, "", file_name
             counts = {s: sum(1 for i in progress.entries if i.state is s) for s in EntryState}

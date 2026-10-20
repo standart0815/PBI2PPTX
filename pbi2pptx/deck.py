@@ -3,7 +3,7 @@
 Rules (docs/DESIGN.md, "Slide composition"):
 - Slides that come with the Template are dropped; the Deck has only page slides.
 - Of the layout's placeholders only the title and the footers stay on a slide.
-- The Page Image is as large as possible inside the Image Area, anchored top-left.
+- The Page Image is as large as possible inside the Image Area (or the Custom Image Area), anchored top-left.
 - A page that could not be captured becomes an Error Slide; the Export carries on.
 - With "Show Filters on slides", a Filter Box lists the Entry's Filters to the right of the page.
 """
@@ -25,6 +25,7 @@ from .template import (
     FOOTER_TYPES,
     TITLE_TYPES,
     Box,
+    custom_image_area,
     fit_top_left,
     image_area,
     layout_by_name,
@@ -80,9 +81,10 @@ FILTER_BOX_SHARE = 0.20  # the Filter Box needs at least this share of the Image
 FILTER_BOX_PT = 12
 
 
-def filter_box_right_edge(layout, area: Box, slide_width: int) -> int:
-    """Inside a picture placeholder its edge; otherwise the title's left margin, mirrored on the right."""
-    if any(placeholder_type(ph) == PP_PLACEHOLDER.PICTURE for ph in layout.placeholders):
+def filter_box_right_edge(layout, area: Box, slide_width: int, custom: bool = False) -> int:
+    """Inside a Custom Image Area or a picture placeholder its edge; otherwise the title's left margin,
+    mirrored on the right."""
+    if custom or any(placeholder_type(ph) == PP_PLACEHOLDER.PICTURE for ph in layout.placeholders):
         return area.right
     titles = [ph for ph in layout.placeholders if placeholder_type(ph) in TITLE_TYPES]
     margin = int(titles[0].left) if titles and int(titles[0].left) < slide_width // 2 else 0
@@ -161,11 +163,15 @@ def build_deck(
     layout_name: Optional[str] = None,
     language: str = "de",
     exported_at: Optional[datetime] = None,
+    custom_area: Optional[Box] = None,
 ) -> Path:
     prs = open_template(template)
     layout = layout_by_name(prs, layout_name) if layout_name else preselected_layout(prs)
     _drop_template_slides(prs)
-    area = image_area(layout, prs.slide_width, prs.slide_height)
+    if custom_area is not None:
+        area = custom_image_area(custom_area, int(prs.slide_width), int(prs.slide_height))
+    else:
+        area = image_area(layout, prs.slide_width, prs.slide_height)
     labels = LABELS[language]
     exported_at = exported_at or datetime.now()
 
@@ -180,7 +186,7 @@ def build_deck(
             with Image.open(entry.image) as img:
                 width, height = img.size
             if entry.filter_box:
-                right_edge = filter_box_right_edge(layout, area, int(prs.slide_width))
+                right_edge = filter_box_right_edge(layout, area, int(prs.slide_width), custom_area is not None)
                 box, filter_box = place_with_filter_box(area, width, height, right_edge)
             else:
                 box, filter_box = fit_top_left(area, width, height), None

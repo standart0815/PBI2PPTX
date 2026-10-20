@@ -152,6 +152,14 @@ Every page slide uses the same layout from the Template. PBI2PPTX recommends one
 - **The sketch** shows the chosen layout: title and footers in grey, the picture area dashed. Pages go into the picture area as large as possible, anchored top left, and never cover the title or footers.
 - If a Saved Selection asks for a layout this Template doesn't have, PBI2PPTX uses the recommended one and says so.
 
+### Your own picture area
+
+Below the layouts, **Picture area** shows where pages go, in cm from the slide's top-left corner: **Left** and **Top** for the page's top-left corner, and **Max. width** and **Max. height** for the room it may take. Pages are made as large as fits in that room, never stretched or cropped. The Filter Box, if shown, also stays inside it.
+
+- The fields start with the layout's own picture area. Change any value to set your own; the sketch follows. It applies to every page and is saved in the Saved Selection.
+- A warning appears when your area reaches into the title, the footers or a graphic. Values that reach outside the slide are refused.
+- **Back to the layout's area** undoes your values. Choosing another layout keeps them; a template whose slides they don't fit on drops them, and says so.
+
 ### Filters on slides
 
 **Show Filters on slides** adds a **Filter Box** to every slide whose Entry has Filters. It lists them under the heading "Filter" ("Filters" in English), one line each, such as "Country: Germany, France". Date Filters show the dates used, in the Render Language: "Date: 01.01.2026 – 19.10.2026", "Date: ab 01.01.2026" or "Date: bis 19.10.2026" ("from …", "until …" in English). The speaker notes also name the Date Rule, such as "19.10.2026 (Heute)". The box sits to the right of the page, top-aligned, in the template's font and colour.

@@ -104,3 +104,15 @@ def test_refuses_files_that_are_not_templates(tmp_path):
         open_template(b"PK\x03\x04 not really a zip")
     with pytest.raises(NotATemplate):
         open_template(b"%PDF-1.7")
+
+
+def test_custom_image_area_must_stay_on_the_slide():
+    from pbi2pptx.template import CUSTOM_AREA_SLACK, OutsideSlide, custom_image_area
+
+    slide_w, slide_h = 1000_000, 600_000
+    assert custom_image_area(Box(10, 20, 500, 300), slide_w, slide_h) == Box(10, 20, 500, 300)
+    # passing the edge by rounding only is trimmed back to the edge
+    assert custom_image_area(Box(0, 0, slide_w + CUSTOM_AREA_SLACK, slide_h), slide_w, slide_h) == Box(0, 0, slide_w, slide_h)
+    for outside in (Box(0, 0, slide_w + CUSTOM_AREA_SLACK + 1, 10), Box(-1, 0, 10, 10), Box(0, 0, 0, 10)):
+        with pytest.raises(OutsideSlide):
+            custom_image_area(outside, slide_w, slide_h)
