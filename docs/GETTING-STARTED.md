@@ -11,7 +11,7 @@ Terms such as *Power BI Window*, *Selection* and *Deck* are explained in [GLOSSA
 
 ## Installing
 
-Download the installer for your system from the project's GitHub **Releases** page. The installers are **not code-signed** yet, so macOS and Windows warn before the first start. This is expected.
+Download the installer for your system from the [Releases page](https://github.com/standart0815/PBI2PPTX/releases). The installers are **not code-signed** yet, so macOS and Windows warn before the first start. This is expected.
 
 **macOS:** open `PBI2PPTX-0.1.0-macOS.dmg` and drag **PBI2PPTX** into **Applications**. On the first start, macOS says it can't check the app:
 1. Click **Done**.

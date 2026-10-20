@@ -26,6 +26,11 @@ dependencies = [
     "uvicorn>=0.32",
 ]
 
+[project.urls]
+Homepage = "https://github.com/standart0815/PBI2PPTX"
+Issues = "https://github.com/standart0815/PBI2PPTX/issues"
+Changelog = "https://github.com/standart0815/PBI2PPTX/blob/main/CHANGELOG.md"
+
 [project.scripts]
 pbi2pptx = "pbi2pptx.app:main"
 

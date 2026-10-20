@@ -18,7 +18,7 @@ You sign in to Power BI with your own account in a browser window the tool contr
 
 ## Installing
 
-Download the installer for your system from the project's GitHub **Releases** page:
+Download the installer for your system from the [Releases page](https://github.com/standart0815/PBI2PPTX/releases):
 
 - **macOS:** `PBI2PPTX-<version>-macOS.dmg`
 - **Windows:** `PBI2PPTX-<version>-Windows-Setup.exe` (installs for the current user, no administrator rights needed)
