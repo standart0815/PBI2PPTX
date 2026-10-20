@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api, Refused } from "./api";
+import { areaRect, ImageAreaFields, outsideSlide } from "./ImageAreaFields";
 import { LayoutInfo, Rect, Selection, TemplateInfo } from "./types";
 
 const LANGUAGES: { value: Selection["renderLanguage"]; label: string; sample: string }[] = [
@@ -38,6 +39,13 @@ export function TemplatePanel({
     }
     setSelection((s) => (s.slideLayout === fallback ? s : { ...s, slideLayout: fallback }));
   }, [template, chosen, selection.slideLayout, usable, setSelection]);
+
+  // Keep the Custom Image Area only while it fits on this Template's slides.
+  useEffect(() => {
+    if (!template || !selection.imageArea || !outsideSlide(selection.imageArea, template)) return;
+    setNotice("Your own picture area doesn't fit on this template's slides; using the layout's area instead.");
+    setSelection((s) => ({ ...s, imageArea: null }));
+  }, [template, selection.imageArea, setSelection]);
 
   async function upload(file: File) {
     setBusy(true);
@@ -120,8 +128,23 @@ export function TemplatePanel({
               <p className="muted small">Can't hold a page (no title or no room below it): {unusable.map((l) => l.name).join(", ")}</p>
             )}
           </fieldset>
-          {chosen && <LayoutSketch layout={chosen} aspect={template.slideHeightCm / template.slideWidthCm} />}
+          {chosen && (
+            <LayoutSketch
+              layout={chosen}
+              aspect={template.slideHeightEmu / template.slideWidthEmu}
+              area={selection.imageArea ? areaRect(selection.imageArea, template) : chosen.imageArea}
+              custom={!!selection.imageArea}
+            />
+          )}
         </div>
+      )}
+      {template && chosen && (
+        <ImageAreaFields
+          layout={chosen}
+          template={template}
+          area={selection.imageArea ?? null}
+          onChange={(imageArea) => setSelection((s) => ({ ...s, imageArea }))}
+        />
       )}
 
       <fieldset className="languages">
@@ -156,7 +179,7 @@ export function TemplatePanel({
 }
 
 // A sketch of a Slide Layout: title and footers grey, the picture area dashed, colliding graphics red.
-function LayoutSketch({ layout, aspect }: { layout: LayoutInfo; aspect: number }) {
+function LayoutSketch({ layout, aspect, area, custom }: { layout: LayoutInfo; aspect: number; area: Rect | null; custom: boolean }) {
   const W = 320;
   const H = Math.round(W * aspect);
   const r = (rect: Rect) => ({ x: rect.x * W, y: rect.y * H, width: rect.w * W, height: rect.h * H });
@@ -168,13 +191,13 @@ function LayoutSketch({ layout, aspect }: { layout: LayoutInfo; aspect: number }
         {layout.footers.map((f, i) => (
           <rect key={i} className="sk-footer" {...r(f)} />
         ))}
-        {layout.imageArea && <rect className="sk-area" {...r(layout.imageArea)} />}
+        {area && <rect className="sk-area" {...r(area)} />}
         {layout.graphics.map((g) => (
           <rect key={g.name} className="sk-graphic" {...r(g)} />
         ))}
       </svg>
       <figcaption className="muted small">
-        Pages go into the dashed area, as large as possible, from the top left.
+        Pages go into the dashed area{custom && " (your own)"}, as large as possible, from the top left.
         {layout.graphics.length > 0 && " Red: graphics in the way."}
       </figcaption>
     </figure>

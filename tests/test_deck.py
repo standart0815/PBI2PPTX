@@ -128,3 +128,45 @@ def test_filter_box_on_slides(sample_template, sample_pages, tmp_path, layout_na
     assert none is None
     assert unfiltered_picture.width >= picture.width  # only slides with Filters make room
     assert all(s.name != "Filter Box" for s in failed.shapes)
+
+
+# --- Custom Image Area ------------------------------------------------------------------------
+
+from PIL import Image  # noqa: E402
+
+from pbi2pptx.template import OutsideSlide, fit_top_left  # noqa: E402
+
+CUSTOM = Box(int(Cm(2)), int(Cm(4)), int(Cm(20)), int(Cm(10)))
+
+
+def _size(path):
+    with Image.open(path) as img:
+        return img.size
+
+
+def test_custom_image_area_holds_page_filter_box_and_error_text(sample_template, sample_pages, tmp_path):
+    entries = [
+        CapturedEntry("with Filters", URL, sample_pages[0], "Example", filter_box=LINES),
+        CapturedEntry("without Filters", URL, sample_pages[0], "Example"),
+        CapturedEntry("failed", URL, None, "Example", error="x"),
+    ]
+    prs = Presentation(build_deck(sample_template, entries, tmp_path / "deck.pptx", language="en", custom_area=CUSTOM))
+    with_filters, without_filters, failed = prs.slides
+
+    picture, filter_box = _boxes(with_filters)
+    assert (picture.left, picture.top) == (CUSTOM.left, CUSTOM.top)
+    assert CUSTOM.contains(picture) and CUSTOM.contains(Box.of(filter_box))
+    assert Box.of(filter_box).right == CUSTOM.right
+
+    alone, _ = _boxes(without_filters)
+    assert alone == fit_top_left(CUSTOM, *_size(sample_pages[0]))
+
+    (text,) = [Box.of(s) for s in failed.shapes if s.has_text_frame and "could not be captured" in s.text_frame.text]
+    assert text == CUSTOM
+
+
+def test_custom_image_area_outside_the_slide_is_refused(sample_template, sample_pages, tmp_path):
+    entry = CapturedEntry("Example", URL, sample_pages[0], "Example")
+    beyond = Box(int(Cm(20)), 0, int(Cm(20)), int(Cm(5)))  # the slide is 33.9 cm wide
+    with pytest.raises(OutsideSlide, match="outside the slide"):
+        build_deck(sample_template, [entry], tmp_path / "deck.pptx", custom_area=beyond)

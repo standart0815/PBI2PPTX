@@ -13,6 +13,7 @@ only the files they can't read):
       "renderLanguage": "de-DE",
       "slideLayout": null,
       "showFilters": false,            # a Filter Box on slides whose Entry has Filters
+      "imageArea": null,               # or a Custom Image Area in cm: {"left", "top", "width", "height"}
       "entries": [
         {
           "pageUrl": "https://app.powerbi.com/groups/…/reports/…/…",
@@ -35,6 +36,7 @@ import re
 from dataclasses import dataclass, field
 
 from .page_url import DateFilter, filter_from_json, parse_page_url
+from .template import EMU_PER_CM, Box
 
 SCHEMA_VERSION = 2  # the newest format this version reads and writes
 MAX_ENTRIES = 50
@@ -44,6 +46,34 @@ DEFAULT_NAME = "Untitled Selection"
 
 class SelectionError(ValueError):
     """A Saved Selection that can't be read, with a message for the User."""
+
+
+@dataclass(frozen=True)
+class CustomImageArea:
+    """The Custom Image Area, in cm from the slide's top-left corner."""
+
+    left: float
+    top: float
+    width: float
+    height: float
+
+    def to_json(self) -> dict:
+        return {"left": self.left, "top": self.top, "width": self.width, "height": self.height}
+
+    @classmethod
+    def from_json(cls, data) -> "CustomImageArea":
+        if not isinstance(data, dict):
+            raise SelectionError("The picture area is not an object")
+        values = [data.get(k) for k in ("left", "top", "width", "height")]
+        if not all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in values):
+            raise SelectionError("The picture area needs a left, top, width and height in cm")
+        left, top, width, height = (round(float(v), 2) for v in values)
+        if left < 0 or top < 0 or width <= 0 or height <= 0:
+            raise SelectionError("The picture area needs a width and a height, and starts on the slide")
+        return cls(left, top, width, height)
+
+    def box(self) -> Box:
+        return Box(*(round(v * EMU_PER_CM) for v in (self.left, self.top, self.width, self.height)))
 
 
 @dataclass
@@ -93,6 +123,7 @@ class Selection:
     render_language: str = "de-DE"
     slide_layout: str | None = None
     show_filters: bool = False
+    image_area: CustomImageArea | None = None  # None: the Slide Layout's Image Area
 
     def to_json(self) -> dict:
         dated = any(isinstance(f, DateFilter) for e in self.entries for f in e.filters)
@@ -103,6 +134,7 @@ class Selection:
             "renderLanguage": self.render_language,
             "slideLayout": self.slide_layout,
             "showFilters": self.show_filters,
+            "imageArea": self.image_area.to_json() if self.image_area else None,
             "entries": [e.to_json() for e in self.entries],
         }
 
@@ -127,6 +159,7 @@ class Selection:
             render_language=language if language in RENDER_LANGUAGES else "de-DE",
             slide_layout=(str(data["slideLayout"]).strip() or None) if data.get("slideLayout") else None,
             show_filters=data.get("showFilters") is True,
+            image_area=CustomImageArea.from_json(data["imageArea"]) if data.get("imageArea") is not None else None,
         )
 
     # --- The file ----------------------------------------------------------------------------

@@ -4,6 +4,8 @@ All notable changes to PBI2PPTX are listed here. Versions follow [Semantic Versi
 
 ## Unreleased
 
+- **Your own picture area:** set where pages go on the slide (top-left corner, maximum width and height in cm) instead of the layout's picture area. It is saved in the Saved Selection.
+
 ## 0.1.0
 
 The first public version.

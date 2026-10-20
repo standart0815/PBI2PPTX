@@ -82,8 +82,12 @@ The one layout from the Template, chosen by the User, that every Entry's slide u
 _Avoid_: master, design
 
 **Image Area**:
-The part of a slide that a Page Image may occupy. By default it is the full slide width, between the bottom of the title (the header) and the top of any footers. If the Slide Layout has a picture placeholder, that placeholder's box is the Image Area instead.
+The part of a slide that a Page Image may occupy. By default it is the full slide width, between the bottom of the title (the header) and the top of any footers. If the Slide Layout has a picture placeholder, that placeholder's box is the Image Area instead. A Custom Image Area replaces both. The Page Image, the Filter Box and the text of an Error Slide all stay inside it.
 _Avoid_: content area, body, canvas
+
+**Custom Image Area**:
+An Image Area that the User sets for the whole Deck: a top-left corner and a maximum width and height. The Page Image is fitted inside it from the top left, as large as possible. It may overlap the title or footers, with a warning, but never reaches outside the slide.
+_Avoid_: position, frame, custom size
 
 **Decorative Graphic**:
 A picture or shape that a Template's layout or master shows on every slide, and that is not a placeholder. If it reaches into the Image Area, the User is warned.
