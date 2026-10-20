@@ -2,6 +2,7 @@
 
 A local desktop tool for Windows and macOS that turns a user's choice of Power BI report pages into one PowerPoint deck, built from the user's own template, with each page shown as an image. Users sign in to Power BI with their own credentials in a browser window the tool controls. No Entra app registration or Power BI API is involved.
 
+- [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md) explains how to start and use it.
 - [docs/DESIGN.md](docs/DESIGN.md) describes what the tool does.
 - [docs/MILESTONE-3.md](docs/MILESTONE-3.md) is the build plan.
 - [GLOSSARY.md](GLOSSARY.md) defines the terms.

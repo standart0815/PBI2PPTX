@@ -24,3 +24,18 @@ jobs:
         run: uv run playwright install chromium
       - name: Test
         run: uv run pytest -q
+
+  interface:
+    name: Interface build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install
+        run: npm --prefix ui ci
+      - name: Type-check and build
+        run: npm --prefix ui run build
