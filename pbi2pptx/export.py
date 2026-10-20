@@ -1,7 +1,7 @@
 """The Export: captures every Entry of a Selection and builds the Deck.
 
-One Export at a time. It runs in the background, holds the Power BI Window for its whole
-duration, reports progress per Entry, and can be cancelled between Entries. Page Images live in
+One Export at a time. It runs in the background, holds the Power BI Window (or, for a Hidden
+Export, an invisible browser) for its whole duration, reports progress per Entry, and can be cancelled between Entries. Page Images live in
 a temporary folder that is deleted when the Export ends; the Deck stays in memory until it is
 downloaded, a new Export starts, or an hour has passed (DESIGN.md, Data handling).
 """
@@ -128,7 +128,7 @@ class Exporter:
     def running(self) -> bool:
         return self._task is not None and not self._task.done()
 
-    def start(self, selection: Selection, template: bytes | None) -> None:
+    def start(self, selection: Selection, template: bytes | None, hidden: bool = False) -> None:
         if self.running:
             raise ExportRefused("An Export is already running.")
         if template is None:
@@ -139,9 +139,9 @@ class Exporter:
         self.progress = ExportProgress(
             ExportState.RUNNING,
             [EntryProgress(e.slide_title, [f.to_json() for f in e.filters]) for e in selection.entries],
-            phase="Preparing the Power BI Window",
+            phase="Starting the hidden browser" if hidden else "Preparing the Power BI Window",
         )
-        self._task = asyncio.create_task(self._run(selection, template))
+        self._task = asyncio.create_task(self._run(selection, template, hidden))
 
     def cancel(self) -> None:
         self._cancel = True
@@ -162,12 +162,12 @@ class Exporter:
             return None
         return self.progress.file_name, self._deck
 
-    async def _run(self, selection: Selection, template: bytes) -> None:
+    async def _run(self, selection: Selection, template: bytes, hidden: bool) -> None:
         language = selection.render_language[:2]
         today = self._today()  # one day for the whole Export, even if it runs past midnight
         progress = self.progress
         try:
-            async with self._windows.exclusive(selection.render_language) as window:
+            async with self._windows.exclusive(selection.render_language, hidden) as window:
                 with tempfile.TemporaryDirectory(prefix="pbi2pptx-") as folder:
                     captured = []
                     for index, (entry, item) in enumerate(zip(selection.entries, progress.entries)):

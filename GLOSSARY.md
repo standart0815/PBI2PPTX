@@ -101,6 +101,10 @@ _Avoid_: locale, UI language
 One run that turns a Selection and a Template into a Deck.
 _Avoid_: job, conversion, download
 
+**Hidden Export**:
+An Export whose Page Images are captured in an invisible browser instead of the Power BI Window, giving the same Page Images. The Power BI Window is closed while it runs and opens again afterwards at the page it showed. Whether an Export is hidden is the User's choice on their machine, not part of the Selection.
+_Avoid_: headless, background export, silent export
+
 **Deck**:
 The PowerPoint file an Export produces, with one slide per Entry.
 _Avoid_: presentation, PowerPoint, report

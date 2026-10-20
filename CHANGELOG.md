@@ -4,6 +4,8 @@ All notable changes to PBI2PPTX are listed here. Versions follow [Semantic Versi
 
 ## Unreleased
 
+- **Export hidden:** capture the pages in an invisible browser instead of the Power BI Window, which closes meanwhile and opens again afterwards. The choice is remembered on this computer.
+
 ## 0.1.0
 
 The first public version.

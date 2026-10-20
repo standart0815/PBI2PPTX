@@ -22,14 +22,14 @@ def entry(url, title, *filters):
     return Entry(url, title, "Beispielbericht", title, list(filters))
 
 
-async def run_export(tmp_path, selection, template, before=None, today=None):
+async def run_export(tmp_path, selection, template, before=None, today=None, hidden=False):
     service, _ = service_for(tmp_path)
     await service.start()
     exporter = Exporter(service, today=lambda: today) if today else Exporter(service)
     try:
         if before:
             await before(service)
-        exporter.start(selection, template)
+        exporter.start(selection, template, hidden=hidden)
         while exporter.running:
             await asyncio.sleep(0.2)
         return exporter, service.language
@@ -201,3 +201,13 @@ def test_impossible_pages_become_error_slides(tmp_path, sample_template):
     assert "Calendar/Date" in empty and "01.11.2026" in empty and "31.10.2026" in empty
     assert "11" in eleven and "10" in eleven
     assert "2.000" in too_long or "2000" in too_long
+
+
+def test_a_hidden_export_gives_the_same_deck(tmp_path, sample_template):
+    selection = Selection("Hidden", [entry(WS_PAGE, "Umsatz"), entry(WS_PAGE, "Umsatz Deutschland", GERMANY)])
+    exporter, _ = asyncio.run(run_export(tmp_path, selection, sample_template.read_bytes(), hidden=True))
+    assert exporter.progress.state is ExportState.DONE
+    assert [e.state for e in exporter.progress.entries] == [EntryState.CAPTURED, EntryState.CAPTURED]
+    pictures = [s for slide in slides(exporter.deck()[1]) for s in slide.shapes if s.shape_type == MSO_SHAPE_TYPE.PICTURE]
+    assert len(pictures) == 2
+

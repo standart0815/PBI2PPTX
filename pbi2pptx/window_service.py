@@ -2,6 +2,9 @@
 
 The local server never drives the window directly: it asks this service, which serialises
 every operation with one lock ("Add current page" and an Export must never run at the same time).
+
+A Hidden Export captures in an invisible browser instead. The browser profile can't be open twice,
+so the Power BI Window closes for it and opens again afterwards at the page it showed.
 """
 
 from __future__ import annotations
@@ -30,6 +33,7 @@ class WindowState(str, Enum):
     OPEN = "open"
     CLOSED = "closed"  # the User closed the window; it can be reopened
     FAILED = "failed"  # no supported browser, or it could not start
+    HIDDEN_EXPORT = "hidden export"  # closed while a Hidden Export uses the profile
 
 
 @dataclass
@@ -45,9 +49,12 @@ class WindowStatus:
         return data
 
 
+HIDDEN_RUNNING = "A hidden Export is running. The Power BI Window opens again when it has finished."
+
+
 class WindowService:
-    def __init__(self, factory: Callable[[str], PowerBIWindow] = PowerBIWindow, language: str = "de-DE"):
-        self._factory = factory  # called with the Render Language
+    def __init__(self, factory: Callable[..., PowerBIWindow] = PowerBIWindow, language: str = "de-DE"):
+        self._factory = factory  # called with the Render Language, and headless=True for a Hidden Export
         self.language = language
         self._window: PowerBIWindow | None = None
         self._state = WindowState.CLOSED
@@ -65,6 +72,8 @@ class WindowService:
 
     async def status(self) -> WindowStatus:
         window = self._window
+        if self._state is WindowState.HIDDEN_EXPORT:
+            return WindowStatus(self._state, message=HIDDEN_RUNNING)
         if self._state is not WindowState.OPEN or window is None:
             return WindowStatus(self._state, message=self._message)
         try:
@@ -74,6 +83,8 @@ class WindowService:
 
     async def show(self) -> None:
         """Bring the Power BI Window to the front, reopening it if the User closed it."""
+        if self._state is WindowState.HIDDEN_EXPORT:
+            raise Busy(HIDDEN_RUNNING)
         if self.busy and self._window is not None:  # during an Export: just show it, don't wait
             await self._window.page.bring_to_front()
             return
@@ -110,9 +121,14 @@ class WindowService:
             return await window.check_filters(page_url, filters)
 
     @contextlib.asynccontextmanager
-    async def exclusive(self, language: str) -> AsyncIterator[PowerBIWindow]:
-        """The window for an Export, in the Render Language, with nobody else driving it meanwhile."""
+    async def exclusive(self, language: str, hidden: bool = False) -> AsyncIterator[PowerBIWindow]:
+        """The window for an Export, in the Render Language, with nobody else driving it meanwhile.
+        Hidden: an invisible browser on the same profile, while the Power BI Window is closed."""
         async with self._lock:
+            if hidden:
+                async with self._hidden_window(language) as window:
+                    yield window
+                return
             window = self._open_window()
             if language != self.language:
                 # The browser's language is fixed at launch: reopen with the same profile (and session).
@@ -123,6 +139,33 @@ class WindowService:
             if not window.is_signed_in():
                 raise WindowNotOpen("Sign in to Power BI in the Power BI Window first.")
             yield window
+
+    @contextlib.asynccontextmanager
+    async def _hidden_window(self, language: str) -> AsyncIterator[PowerBIWindow]:
+        was_open = self._state is WindowState.OPEN and self._window is not None
+        showing = self._window.page.url if was_open else ""
+        self.language = language
+        await self._close()
+        self._state = WindowState.HIDDEN_EXPORT
+        window = self._factory(language, headless=True)
+        signed_in = False
+        try:
+            await window.__aenter__()
+            await window.open_home()
+            await window.page.wait_for_timeout(window.settle_ms)  # let a signed-out session reach the sign-in page
+            signed_in = window.is_signed_in()
+            if not signed_in:
+                raise WindowNotOpen("The hidden Export isn't signed in to Power BI. Sign in in the Power BI Window, then export again.")
+            yield window
+        finally:
+            with contextlib.suppress(Exception):  # it may not have started
+                await window.__aexit__(None, None, None)
+            self._state = WindowState.CLOSED
+            if was_open or not signed_in:  # signed out: reopen so the User can sign in
+                await self._open()
+                if self._window and showing.startswith("https://app.powerbi.com/"):
+                    with contextlib.suppress(Exception):  # the page went away: Power BI's home is fine
+                        await self._window.page.goto(showing)
 
     @contextlib.asynccontextmanager
     async def _quick_lock(self):

@@ -54,7 +54,8 @@ Terms are defined in [GLOSSARY.md](../GLOSSARY.md). The decisions behind the des
 4. **Export**
    - The User picks the Template (.potx), a Slide Layout (see [Slide composition](#slide-composition) for which one is preselected) and the Render Language (German by default, English possible).
    - An Export holds at most 50 Entries and runs one at a time, with a progress screen.
-   - It runs in the **visible Power BI Window**, because the browser profile can't be shared with a second window. The User watches it step through the pages and is asked not to click in it until it's done.
+   - By default it runs in the **visible Power BI Window**. The User watches it step through the pages and is asked not to click in it until it's done.
+   - **Hidden Export:** with "Export hidden" ticked, the pages are captured in an invisible browser instead. The browser profile can't be open twice, so the Power BI Window closes for the Export and opens again afterwards at the page it showed, also after a cancelled or failed Export. Meanwhile "Show Power BI Window" is disabled. The capture steps are the same, so the Page Images are too. If the invisible browser finds no valid sign-in, the Export stops before the first page and the Power BI Window opens for the User to sign in. The choice is remembered on the User's machine and is not part of the Saved Selection.
    - Pages are not checked when a Saved Selection is opened. A page that was deleted or can't be accessed becomes an Error Slide during the Export.
 5. **Capturing**
    - For each Entry, the Power BI Window opens the Page URL with its Filters.
