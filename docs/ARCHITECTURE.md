@@ -21,7 +21,7 @@ One process per User, started by the installed app's icon.
    default browser: the interface         separate window: Power BI
 ```
 
-- **One owner for the Power BI Window.** A single async task drives it. "Add current page" and an Export are queued, never run in parallel, and while an Export runs, "Add current page" is disabled.
+- **One owner for the Power BI Window.** A single async task drives it. "Add current page" and an Export are queued, never run in parallel, and while an Export runs, "Add current page" is disabled. A Hidden Export closes the window and opens an invisible browser on the same profile instead, then opens the window again.
 - **The local server only accepts calls carrying the per-launch token.** Other websites open in the User's browser can't drive the tool.
 - **Everything that depends on the Power BI interface sits in one module** ([power_bi_ui.py](../pbi2pptx/power_bi_ui.py)). That covers selectors, button texts, the tip popup and the reset dialog, so a Power BI release means one place to fix.
 - **Files go through the browser.** The Template is picked with a file input. The Deck and the Saved Selection come back as downloads, so the tool needs no native file dialogs.

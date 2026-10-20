@@ -25,6 +25,16 @@ export function ExportPanel({
   const [progress, setProgress] = useState<ExportProgress | null>(null);
   const [deckReady, setDeckReady] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [hidden, setHidden] = useState(false);
+
+  useEffect(() => {
+    api.getSettings().then((r) => setHidden(r.settings.hiddenExport)).catch(() => undefined);
+  }, []);
+
+  function chooseHidden(value: boolean) {
+    setHidden(value);
+    api.saveSettings({ hiddenExport: value }).catch(() => undefined); // kept for this run even if not saved
+  }
 
   const running = progress?.state === "running";
 
@@ -59,7 +69,7 @@ export function ExportPanel({
   async function start() {
     setProblem(null);
     try {
-      await api.startExport(toJson(selection));
+      await api.startExport(toJson(selection), hidden);
       await refresh();
     } catch (e) {
       setProblem(e instanceof Refused ? e.message : String(e));
@@ -91,10 +101,17 @@ export function ExportPanel({
           ) : (
             <p className="muted">
               {selection.entries.length} page{selection.entries.length === 1 ? "" : "s"} into <strong>{template?.fileName}</strong>,
-              layout <strong>{selection.slideLayout}</strong>, {selection.renderLanguage === "de-DE" ? "Deutsch" : "English"}. The
-              Power BI Window steps through the pages; please don't click in it meanwhile.
+              layout <strong>{selection.slideLayout}</strong>, {selection.renderLanguage === "de-DE" ? "Deutsch" : "English"}.{" "}
+              {hidden
+                ? "The pages are captured out of sight; the Power BI Window closes meanwhile and opens again afterwards."
+                : "The Power BI Window steps through the pages; please don't click in it meanwhile."}
             </p>
           )}
+          <label className="language-option">
+            <input type="checkbox" checked={hidden} onChange={(e) => chooseHidden(e.target.checked)} />
+            Export hidden
+            <span className="muted small">don't show the pages being captured</span>
+          </label>
           <div className="actions">
             <button type="button" disabled={missing.length > 0} onClick={start}>
               Export Deck

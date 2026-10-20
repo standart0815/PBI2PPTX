@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
+import logging
 import secrets
 from datetime import date
 from pathlib import Path
@@ -29,6 +31,7 @@ from .selection import SCHEMA_VERSION, Entry, Selection, SelectionError
 from .template import EMU_PER_CM, Box, NotATemplate, OutsideSlide, TemplateInfo, custom_image_area, describe_template
 from .window_service import Busy, WindowNotOpen, WindowService
 
+log = logging.getLogger("pbi2pptx.server")
 TOKEN_HEADER = "X-PBI2PPTX-Token"
 PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 FILE_NAME_HEADER = "X-File-Name"
@@ -53,6 +56,19 @@ async def json_body(request: Request) -> dict:
     except ValueError:
         return {}
     return data if isinstance(data, dict) else {}
+
+
+DEFAULT_SETTINGS = {"hiddenExport": False}
+
+
+def read_settings(path: Path | None) -> dict:
+    """The User's settings on this machine: how they like to export, never report content."""
+    try:
+        stored = json.loads(path.read_text(encoding="utf-8")) if path else {}
+    except (OSError, ValueError):
+        stored = {}
+    stored = stored if isinstance(stored, dict) else {}
+    return {key: stored[key] if isinstance(stored.get(key), bool) else default for key, default in DEFAULT_SETTINGS.items()}
 
 
 def template_json(info: TemplateInfo) -> dict:
@@ -94,11 +110,13 @@ def create_app(
     on_quit: Callable[[], None] = lambda: None,
     on_started: Callable[[], None] = lambda: None,
     static_dir: Path = STATIC,
+    settings_file: Path | None = None,  # None: settings last only while the tool runs
 ) -> Starlette:
     allowed = set(allowed_hosts)
     # The Template the User picked: in memory only, for the Export (ADR 0003: nothing stored).
     template: dict = {}
     exporter = Exporter(service)
+    settings = read_settings(settings_file)
 
     def guard(request: Request, needs_token: bool) -> Response | None:
         if request.headers.get("host", "") not in allowed:
@@ -126,7 +144,10 @@ def create_app(
         return JSONResponse({"version": __version__, "window": window.to_json()})
 
     async def show_window(request: Request) -> Response:
-        await service.show()
+        try:
+            await service.show()
+        except Busy as e:
+            return problem(409, str(e))
         return JSONResponse({"ok": True})
 
     async def sign_out(request: Request) -> Response:
@@ -221,6 +242,20 @@ def create_app(
         }
         return JSONResponse({"result": verdict.check.value, "message": messages.get(verdict.check, "")})
 
+    async def get_settings(request: Request) -> Response:
+        return JSONResponse({"settings": settings})
+
+    async def put_settings(request: Request) -> Response:
+        body = await json_body(request)
+        settings.update({k: v for k, v in body.items() if k in DEFAULT_SETTINGS and isinstance(v, bool)})
+        if settings_file:
+            try:
+                settings_file.parent.mkdir(parents=True, exist_ok=True)
+                settings_file.write_text(json.dumps(settings), encoding="utf-8")
+            except OSError:
+                log.warning("Could not save the settings to %s", settings_file)
+        return JSONResponse({"settings": settings})
+
     async def open_page(request: Request) -> Response:
         body = await json_body(request)
         try:
@@ -239,11 +274,12 @@ def create_app(
 
     async def start_export(request: Request) -> Response:
         try:
-            selection = Selection.from_json({**((await json_body(request)).get("selection") or {}), "schemaVersion": SCHEMA_VERSION})
+            body = await json_body(request)
+            selection = Selection.from_json({**(body.get("selection") or {}), "schemaVersion": SCHEMA_VERSION})
             if selection.image_area and template:
                 info = template["info"]
                 custom_image_area(selection.image_area.box(), info.slide_width, info.slide_height)
-            exporter.start(selection, template.get("data"))
+            exporter.start(selection, template.get("data"), hidden=body.get("hidden") is True)
         except (SelectionError, ExportRefused, OutsideSlide) as e:
             return problem(409 if isinstance(e, ExportRefused) else 422, str(e))
         return JSONResponse({"ok": True}, status_code=202)
@@ -299,6 +335,8 @@ def create_app(
         Route("/api/export/deck", api(download_deck)),
         Route("/api/template", api(get_template)),
         Route("/api/template", api(put_template), methods=["POST"]),
+        Route("/api/settings", api(get_settings)),
+        Route("/api/settings", api(put_settings), methods=["POST"]),
         Route("/api/quit", api(quit_tool), methods=["POST"]),
     ]
     if (static_dir / "assets").is_dir():

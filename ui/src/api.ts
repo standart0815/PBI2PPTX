@@ -5,11 +5,16 @@ import type { EntryJson, ExportProgress, Filter, FilterCheckResult, LeftOut, Sel
 
 const token = new URLSearchParams(window.location.search).get("token") ?? "";
 
-export type WindowState = "starting" | "open" | "closed" | "failed";
+export type WindowState = "starting" | "open" | "closed" | "failed" | "hidden export";
 
 export interface Status {
   version: string;
   window: { state: WindowState; signed_in: boolean; browser: string; message: string };
+}
+
+/** The User's settings on this machine (pbi2pptx/server.py, DEFAULT_SETTINGS). */
+export interface Settings {
+  hiddenExport: boolean;
 }
 
 /** The server can't be reached: the tool was quit. */
@@ -76,7 +81,9 @@ export const api = {
   uploadTemplate: (file: File) => call<{ template: TemplateInfo }>("/api/template", "POST", file),
   openPage: (pageUrl: string, filters: Filter[] = []) => call("/api/page/open", "POST", { pageUrl, filters }),
   checkFilter: (pageUrl: string, filter: Filter) => call<FilterCheckResult>("/api/filters/check", "POST", { pageUrl, filter }),
-  startExport: (selection: SelectionJson) => call("/api/export", "POST", { selection }),
+  startExport: (selection: SelectionJson, hidden: boolean) => call("/api/export", "POST", { selection, hidden }),
+  getSettings: () => call<{ settings: Settings }>("/api/settings"),
+  saveSettings: (settings: Partial<Settings>) => call<{ settings: Settings }>("/api/settings", "POST", settings),
   exportStatus: () => call<{ export: ExportProgress; deckReady: boolean }>("/api/export"),
   cancelExport: () => call("/api/export/cancel", "POST"),
   downloadDeck: () => download("/api/export/deck"),

@@ -138,6 +138,7 @@ def main(argv=None) -> None:
         allowed_hosts={f"127.0.0.1:{port}", f"localhost:{port}"},
         on_quit=quit_from_interface,
         on_started=interface_ready,
+        settings_file=data_dir() / "settings.json",
     )
     server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning", log_config=None))
     _write_instance_file(port, token)

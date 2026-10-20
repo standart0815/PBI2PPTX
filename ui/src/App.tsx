@@ -155,6 +155,9 @@ function WindowCard({
   } else if (w?.state === "closed") {
     headline = "The Power BI Window is closed";
     hint = "Reopen it to continue.";
+  } else if (w?.state === "hidden export") {
+    headline = "A hidden Export is running";
+    hint = "The Power BI Window opens again when it has finished.";
   } else if (w?.state === "failed") {
     tone = "problem";
     headline = "The Power BI Window could not open";
@@ -172,7 +175,7 @@ function WindowCard({
         </div>
       </div>
       <div className="actions">
-        <button disabled={!!busy || w?.state === "starting"} onClick={() => run("show", api.showWindow)}>
+        <button disabled={!!busy || w?.state === "starting" || w?.state === "hidden export"} onClick={() => run("show", api.showWindow)}>
           {busy === "show" ? "Opening…" : open ? "Show Power BI Window" : "Reopen Power BI Window"}
         </button>
         {open && w?.signed_in && (

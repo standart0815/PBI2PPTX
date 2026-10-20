@@ -60,8 +60,8 @@ class FakeService:
         self.shown = (page_url.url, list(filters))
 
     @contextlib.asynccontextmanager
-    async def exclusive(self, language):
-        self.calls.append(f"export in {language}")
+    async def exclusive(self, language, hidden=False):
+        self.calls.append(f"{'hidden ' if hidden else ''}export in {language}")
         yield FakeWindow()
 
     async def resolve(self, address):
@@ -80,7 +80,7 @@ class FakeWindow:
         return CaptureReport(filters=FilterCheck.APPLIED if filters else FilterCheck.NO_FILTERS)
 
 
-def make(tmp_path, built=False):
+def make(tmp_path, built=False, settings_file=None):
     static = tmp_path / "static"
     if built:
         (static / "assets").mkdir(parents=True)
@@ -94,6 +94,7 @@ def make(tmp_path, built=False):
         on_quit=lambda: events.append("quit"),
         on_started=lambda: events.append("started"),
         static_dir=static,
+        settings_file=settings_file,
     )
     return app, service, events
 
@@ -308,6 +309,33 @@ def test_filter_check_works_out_date_rules_and_refuses_empty_ranges(tmp_path):
     assert service.checked == [DateFilter("Calendar", "Date", date(today.year, 1, 1), today)]
     assert checked["result"] == "not applied" and "holds dates" in checked["message"]
     assert refused.status_code == 422 and "empty today" in refused.json()["error"]
+
+
+def test_the_hidden_export_setting_is_remembered_on_this_machine(tmp_path):
+    settings = tmp_path / "data" / "settings.json"
+    app, _, _ = make(tmp_path, settings_file=settings)
+    with TestClient(app) as client:
+        first = client.get("/api/settings", headers=AUTH).json()
+        client.post("/api/settings", headers=AUTH, json={"hiddenExport": True, "unknown": 1})
+    again, _, _ = make(tmp_path, settings_file=settings)
+    with TestClient(again) as client:
+        later = client.get("/api/settings", headers=AUTH).json()
+    assert first == {"settings": {"hiddenExport": False}}
+    assert later == {"settings": {"hiddenExport": True}}
+
+
+def test_a_hidden_export_is_passed_to_the_window(tmp_path, sample_template):
+    app, service, _ = make(tmp_path)
+    entry = {"pageUrl": PAGE, "pageName": "Umsatz", "reportName": "", "slideTitle": "One", "filters": []}
+    with TestClient(app) as client:
+        upload(client, sample_template.read_bytes())
+        started = client.post("/api/export", headers=AUTH, json={"selection": {"name": "x", "entries": [entry]}, "hidden": True})
+        for _ in range(100):
+            if client.get("/api/export", headers=AUTH).json()["export"]["state"] != "running":
+                break
+            time.sleep(0.1)
+    assert started.status_code == 202
+    assert "hidden export in de-DE" in service.calls
 
 
 def test_entry_links_open_the_page_with_or_without_its_filters(tmp_path):

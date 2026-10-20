@@ -17,13 +17,23 @@ class FakePowerBIWindow(PowerBIWindow):
         return self
 
 
-def service_for(tmp_path):
+class SignedOutPowerBIWindow(FakePowerBIWindow):
+    async def open_home(self):
+        await self.page.goto("https://app.powerbi.com/singleSignOn")
+
+
+def service_for(tmp_path, hidden_signed_in=True):
     profile = tmp_path / "profile"
+    opened = []  # "visible" / "hidden", in order
 
-    def factory(language):
-        return FakePowerBIWindow(language=language, profile=profile, browsers=(None,), headless=True, settle_ms=100, overlay_wait_ms=600)
+    def factory(language, headless=False):
+        opened.append("hidden" if headless else "visible")
+        kind = SignedOutPowerBIWindow if headless and not hidden_signed_in else FakePowerBIWindow
+        return kind(language=language, profile=profile, browsers=(None,), headless=True, settle_ms=100, overlay_wait_ms=600)
 
-    return WindowService(factory), profile
+    service = WindowService(factory)
+    service.opened = opened
+    return service, profile
 
 
 def test_opens_the_window_signed_in(tmp_path):
@@ -106,3 +116,53 @@ def test_adding_needs_an_open_window(tmp_path):
 
     with pytest.raises(WindowNotOpen):
         asyncio.run(check())
+
+
+# --- Hidden Export ----------------------------------------------------------------------------
+
+from pbi2pptx.window_service import Busy  # noqa: E402
+
+
+def test_hidden_export_closes_the_window_and_reopens_it_where_it_was(tmp_path):
+    async def check():
+        service, _ = service_for(tmp_path)
+        await service.start()
+        await service._window.page.goto(WS_PAGE)
+        async with service.exclusive("en-US", hidden=True) as window:
+            during = await service.status()
+            try:
+                await service.show()
+                shown = "shown"
+            except Busy as e:
+                shown = str(e)
+            used = (window.headless, window.language, window.is_signed_in())
+        after = await service.status()
+        url = service._window.page.url
+        await service.stop()
+        return service.opened, during, shown, used, after.state, url
+
+    opened, during, shown, used, after, url = asyncio.run(check())
+    assert opened == ["visible", "hidden", "visible"]
+    assert during.state is WindowState.HIDDEN_EXPORT and "hidden Export is running" in during.message
+    assert "hidden Export is running" in shown
+    assert used == (True, "en-US", True)
+    assert (after, url) == (WindowState.OPEN, WS_PAGE)
+
+
+def test_a_signed_out_hidden_export_stops_and_reopens_the_window_to_sign_in(tmp_path):
+    async def check():
+        service, _ = service_for(tmp_path, hidden_signed_in=False)
+        await service.start()
+        try:
+            async with service.exclusive("de-DE", hidden=True):
+                return "ran"
+        except WindowNotOpen as e:
+            refused = str(e)
+        state = (await service.status()).state
+        await service.stop()
+        return refused, state
+
+    refused, state = asyncio.run(check())
+    assert "isn't signed in" in refused
+    assert state is WindowState.OPEN
+

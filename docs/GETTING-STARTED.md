@@ -183,6 +183,7 @@ Chooses how numbers and dates appear in the pages: **Deutsch** (`1.234,56`, `31.
 The **Export** panel says what's missing before you can start: pages, a Template, or the sign-in. When everything is there, click **Export Deck**.
 
 - **The Power BI Window works through every page**, about 10 seconds each, so 20 pages take 3–4 minutes. Please don't click in it meanwhile. "Show Power BI Window" still works if you want to watch.
+- **Export hidden** captures the pages out of sight instead. The Power BI Window closes while the Export runs and opens again afterwards at the page it showed. If your sign-in has expired, the Export stops and the Power BI Window opens so you can sign in again. PBI2PPTX remembers the choice on this computer.
 - **If you chose English as the Render Language**, the Power BI Window first restarts in English. Your sign-in is kept.
 - **Progress** shows which page is being captured. **Cancel after this page** stops the Export, and then no Deck is made.
 - Adding pages, pasting addresses and checking Filters wait until the Export has finished.
@@ -214,6 +215,7 @@ It holds:
 - `profile/`: the Power BI Window's profile, which includes your Power BI session. **Sign out** deletes it.
 - `pbi2pptx.log`: what PBI2PPTX did (starts, quits, errors). Never report content. Send it along when reporting a problem.
 - `instance.json`: while PBI2PPTX runs, so a second start can find it.
+- `settings.json`: your choices on this computer, such as **Export hidden**.
 
 Nothing is sent anywhere except to Power BI.
 

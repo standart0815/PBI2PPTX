@@ -6,7 +6,8 @@
     uv run python -m pbi2pptx.self_check run --workspace URL --app URL [--myworkspace URL]
                                              --filter "Table/Column=Value" [--template X.potx]
         Uses the kept session. For each route: reads the current page, captures it with and
-        without the Filter, then a page that doesn't exist, then once more in English.
+        without the Filter, then a page that doesn't exist, then once more in English, then once
+        more in a hidden browser (Hidden Export).
         Writes Page Images, an optional Deck and RESULTS.md to out/self-check/<timestamp>/.
 
 --app also accepts a shared App link (/Redirect?action=OpenApp…). Use pages whose Filter
@@ -139,6 +140,24 @@ async def run(routes: list, flt: Filter, template: Path | None, folder: Path) ->
                     None,
                     f"compare {de.name} with {out.name}: number formats should differ ({share_of_changed_pixels(de, out):.1%} of pixels differ)",
                 )
+
+        async with PowerBIWindow(language="de-DE", headless=True) as window:
+            await window.open_home()
+            await window.page.wait_for_timeout(5000)
+            if not window.is_signed_in():
+                results.add("hidden session kept", False, f"the hidden browser isn't signed in – it shows {window.page.url.split('?')[0]}")
+            else:
+                results.add("hidden session kept", True, "Power BI opened signed in without a window")
+                out = folder / "hidden.png"
+                try:
+                    await window.capture(first, [], out)
+                    visible = next(iter(e.image for e in entries if e.image), None)
+                    with Image.open(out) as hidden_img, Image.open(visible) as visible_img:
+                        same_size = hidden_img.size == visible_img.size
+                        detail = f"{hidden_img.size[0]}×{hidden_img.size[1]} px, visible {visible_img.size[0]}×{visible_img.size[1]} px"
+                    results.add("hidden capture matches", same_size, f"{detail}, {share_of_changed_pixels(visible, out):.1%} of pixels differ")
+                except Exception as e:  # noqa: BLE001 - every failure is a result, not a crash
+                    results.add("hidden capture matches", False, str(e).splitlines()[0])
 
     if template and entries:
         deck = build_deck(template, entries, folder / "Deck.pptx")
