@@ -1,14 +1,19 @@
 from starlette.testclient import TestClient
 
+from pbi2pptx.page_url import parse_page_url
+from pbi2pptx.power_bi_window import CurrentPage, NotAReportPage
 from pbi2pptx.server import TOKEN_HEADER, create_app
-from pbi2pptx.window_service import WindowState, WindowStatus
+from pbi2pptx.window_service import WindowNotOpen, WindowState, WindowStatus
 
 TOKEN = "secret-token"
+AUTH = {TOKEN_HEADER: TOKEN}
+PAGE = "https://app.powerbi.com/groups/me/apps/a1a1a1a1-0000-0000-0000-000000000005/reports/11111111-0000-0000-0000-000000000001/aaaa0000000000000001?ctid=t-1"
 
 
 class FakeService:
     def __init__(self):
         self.calls = []
+        self.failure = None
 
     async def start(self):
         self.calls.append("start")
@@ -24,6 +29,17 @@ class FakeService:
 
     async def sign_out(self):
         self.calls.append("sign_out")
+
+    async def current_page(self):
+        if self.failure:
+            raise self.failure
+        return CurrentPage(parse_page_url(PAGE), "Umsatz", "Beispielbericht")
+
+    async def resolve(self, address):
+        if self.failure:
+            raise self.failure
+        parse_page_url(address)  # like the real window: anything else is a ValueError
+        return CurrentPage(parse_page_url(address), "Umsatz", "Beispielbericht")
 
 
 def make(tmp_path, built=False):
@@ -91,3 +107,48 @@ def test_actions_reach_the_window_service_and_quit(tmp_path):
             assert client.post(path, headers={TOKEN_HEADER: TOKEN}).json() == {"ok": True}
     assert service.calls == ["start", "show", "sign_out", "stop"]
     assert events == ["started", "quit"]
+
+
+def test_add_current_page_proposes_an_entry(tmp_path):
+    app, _, _ = make(tmp_path)
+    with TestClient(app) as client:
+        entry = client.post("/api/entries/current", headers=AUTH).json()["entry"]
+    assert entry == {"pageUrl": PAGE, "pageName": "Umsatz", "reportName": "Beispielbericht", "slideTitle": "Umsatz", "filters": []}
+
+
+def test_adding_explains_what_to_do_when_it_cannot(tmp_path):
+    app, service, _ = make(tmp_path)
+    with TestClient(app) as client:
+        service.failure = WindowNotOpen("The Power BI Window isn't open.")
+        closed = client.post("/api/entries/current", headers=AUTH)
+        service.failure = NotAReportPage("no canvas")
+        elsewhere = client.post("/api/entries/current", headers=AUTH)
+        service.failure = None
+        nonsense = client.post("/api/entries/resolve", headers=AUTH, json={"address": "https://example.com"})
+    assert (closed.status_code, closed.json()["error"]) == (409, "The Power BI Window isn't open.")
+    assert elsewhere.status_code == 422 and "isn't showing a report page" in elsewhere.json()["error"]
+    assert nonsense.status_code == 422 and "isn't the address of a Power BI report page" in nonsense.json()["error"]
+
+
+def test_pasted_address_becomes_an_entry(tmp_path):
+    app, _, _ = make(tmp_path)
+    with TestClient(app) as client:
+        entry = client.post("/api/entries/resolve", headers=AUTH, json={"address": PAGE}).json()["entry"]
+    assert entry["pageUrl"] == PAGE
+
+
+def test_save_and_open_a_selection(tmp_path):
+    app, _, _ = make(tmp_path)
+    selection = {
+        "name": "Monthly pack: EMEA",
+        "renderLanguage": "en-US",
+        "slideLayout": None,
+        "entries": [{"pageUrl": PAGE, "pageName": "Umsatz", "reportName": "Beispielbericht", "slideTitle": "DE", "filters": []}],
+    }
+    with TestClient(app) as client:
+        saved = client.post("/api/selection/save", headers=AUTH, json={"selection": selection}).json()
+        opened = client.post("/api/selection/open", headers=AUTH, json={"content": saved["content"]}).json()["selection"]
+        broken = client.post("/api/selection/open", headers=AUTH, json={"content": "{"})
+    assert saved["fileName"] == "Monthly pack EMEA.json"
+    assert opened["entries"] == selection["entries"] and opened["renderLanguage"] == "en-US"
+    assert broken.status_code == 422 and "not valid JSON" in broken.json()["error"]

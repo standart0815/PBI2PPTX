@@ -2,9 +2,12 @@
 
 import asyncio
 
-from pbi2pptx.power_bi_window import PowerBIWindow
-from pbi2pptx.window_service import WindowService, WindowState
-from tests.test_power_bi_window import _serve_fake
+import pytest
+
+from pbi2pptx.page_url import ReachedThrough
+from pbi2pptx.power_bi_window import NotAReportPage, PowerBIWindow
+from pbi2pptx.window_service import WindowNotOpen, WindowService, WindowState
+from tests.test_power_bi_window import APP_LINK, WS_PAGE, _serve_fake
 
 
 class FakePowerBIWindow(PowerBIWindow):
@@ -70,3 +73,31 @@ def test_reports_a_missing_browser(tmp_path):
     status = asyncio.run(check())
     assert status.state is WindowState.FAILED
     assert "No supported browser" in status.message
+
+
+def test_add_current_page_and_paste_an_app_link(tmp_path):
+    async def check():
+        service, _ = service_for(tmp_path)
+        await service.start()
+        try:
+            with pytest.raises(NotAReportPage):  # the window starts at Power BI's home page
+                await service.current_page()
+            await service._window.page.goto(WS_PAGE)
+            current = await service.current_page()
+            pasted = await service.resolve(APP_LINK)
+        finally:
+            await service.stop()
+        return current, pasted
+
+    current, pasted = asyncio.run(check())
+    assert (current.page_name, current.page_url.reached_through) == ("Umsatz", ReachedThrough.WORKSPACE)
+    assert (pasted.page_name, pasted.page_url.reached_through) == ("Umsatz", ReachedThrough.POWER_BI_APP)
+
+
+def test_adding_needs_an_open_window(tmp_path):
+    async def check():
+        service, _ = service_for(tmp_path)
+        await service.current_page()
+
+    with pytest.raises(WindowNotOpen):
+        asyncio.run(check())

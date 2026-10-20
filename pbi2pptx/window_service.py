@@ -11,7 +11,11 @@ from dataclasses import asdict, dataclass
 from enum import Enum
 from typing import Callable
 
-from .power_bi_window import PowerBIWindow, sign_out
+from .power_bi_window import CurrentPage, PowerBIWindow, sign_out
+
+
+class WindowNotOpen(RuntimeError):
+    """The Power BI Window is starting, closed or failed; the interface tells the User what to do."""
 
 
 class WindowState(str, Enum):
@@ -68,6 +72,23 @@ class WindowService:
                 await self._open()
             if self._window:
                 await self._window.page.bring_to_front()
+
+    async def current_page(self) -> CurrentPage:
+        """The page showing in the Power BI Window, for "Add current page"."""
+        async with self._lock:
+            return await self._open_window().current_page()
+
+    async def resolve(self, address: str) -> CurrentPage:
+        """Open a pasted Page URL or App link in the Power BI Window and read the page it lands on."""
+        async with self._lock:
+            window = self._open_window()
+            await window.page.bring_to_front()
+            return await window.resolve(address)
+
+    def _open_window(self) -> PowerBIWindow:
+        if self._state is not WindowState.OPEN or self._window is None:
+            raise WindowNotOpen("The Power BI Window isn't open. Click \"Show Power BI Window\" first.")
+        return self._window
 
     async def sign_out(self) -> None:
         """Close the window, delete its profile (the Power BI session), and reopen it at sign-in."""
