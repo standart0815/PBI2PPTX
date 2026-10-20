@@ -65,6 +65,7 @@ Each step ends with something runnable and tested.
    - Add a **fake Power BI page**: a local HTML fixture that mimics the canvas, pages pane, App navigation, tip popup and reset dialog. The automation can then be tested offline and in CI.
    - Add a **live self-check** (today's `run_checks.py`) to run against real Power BI before every release.
    - Done when: the offline tests pass in CI and the live self-check passes locally.
+   - Status (2026-10-19): **done locally.** It has `power_bi_window.py`, `power_bi_ui.py`, the fake page with 11 offline tests, and `python -m pbi2pptx.self_check`. The live self-check passes on macOS with Chrome across all three routes, taking about 10 s per page. CI runs once the repository is pushed.
 3. **Local server and interface shell.**
    - Server with token check, the React app, and a status bar showing whether the User is signed in, plus "Sign out".
    - Done when: launching opens the interface and the Power BI Window, and the sign-in state shows correctly.

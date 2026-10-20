@@ -13,7 +13,17 @@ Requires [uv](https://docs.astral.sh/uv/). uv installs Python 3.12 itself.
 
 ```bash
 uv sync
+uv run playwright install chromium   # once, for the offline Power BI Window tests
 uv run pytest
 ```
+
+The offline tests drive a fake of the Power BI interface ([tests/fixtures/fake_power_bi.html](tests/fixtures/fake_power_bi.html)). Before every release, also run the **live self-check** against real Power BI, on macOS and on Windows:
+
+```bash
+uv run python -m pbi2pptx.self_check signin
+uv run python -m pbi2pptx.self_check run --workspace <Page URL> --app <Page URL or App link> --filter "Table/Column=Value"
+```
+
+When Power BI changes its interface, the fixes go into [pbi2pptx/power_bi_ui.py](pbi2pptx/power_bi_ui.py) and the fake page.
 
 `prototype/` holds the throwaway prototypes from Milestones 1 and 2. They are kept for reference and aren't part of the package.

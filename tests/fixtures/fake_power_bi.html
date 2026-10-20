@@ -1,0 +1,156 @@
+<!doctype html>
+<!--
+  A fake of the Power BI web interface for offline tests of the Power BI Window.
+  Served for every https://app.powerbi.com/ document by Playwright routing (tests/test_power_bi_window.py).
+  Mirrors the selectors and texts in pbi2pptx/power_bi_ui.py, as observed in Power BI on 2026-10-19.
+
+  Test switches (localStorage):
+    fake-changed      "1": the User has personal changes, so "Reset to default" is enabled
+    fake-actual-size  "1": the canvas is not in fit-to-page view
+-->
+<html>
+<head>
+<meta charset="utf-8">
+<title>Power BI</title>
+<style>
+  body { margin: 0; font: 14px sans-serif; background: #f3f2f1; }
+  .header { position: absolute; left: 0; top: 0; right: 0; height: 0; overflow: hidden; }
+  .ribbon { position: absolute; left: 0; top: 0; right: 0; height: 90px; background: #fff; }
+  .ribbon [role=tab] { display: inline-block; padding: 8px 14px; }
+  .ribbon button { margin: 4px; }
+  .nav { position: absolute; left: 0; top: 100px; width: 260px; background: #fff; }
+  .nav [role=tab], .nav .itemRow { padding: 8px; }
+  .displayArea { position: absolute; left: 300px; top: 150px; width: 1280px; height: 720px; background: #ffffff; overflow: hidden; }
+  .displayArea h1 { margin: 20px; font-size: 48px; color: #222; }
+  .bar { position: absolute; left: 20px; top: 300px; height: 120px; background: #2f5597; }
+  .personal { position: absolute; left: 20px; top: 500px; width: 400px; height: 80px; background: #ffc000; }
+  .optionsMenu { position: absolute; right: 20px; top: 20px; width: 160px; height: 40px; background: #ff0000; }
+  .tutorial-popup { position: absolute; left: 600px; top: 250px; width: 400px; height: 220px; background: #0f6b5c; color: #fff; }
+  [role=dialog] { position: absolute; left: 500px; top: 400px; width: 500px; height: 160px; background: #fff; border: 2px solid #333; }
+</style>
+</head>
+<body>
+<script>
+const REPORT = "11111111-0000-0000-0000-000000000001";
+const PAGES = [
+  { id: "aaaa0000000000000001", name: "Umsatz" },
+  { id: "aaaa0000000000000002", name: "Regionen" },
+];
+const path = location.pathname;
+const query = new URLSearchParams(location.search);
+const store = { get: k => localStorage.getItem(k) === "1", set: (k, v) => v ? localStorage.setItem(k, "1") : localStorage.removeItem(k) };
+
+function el(tag, attrs = {}, text = "") {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v);
+  if (text) e.textContent = text;
+  return e;
+}
+
+function renderCanvas(page) {
+  const old = document.querySelector(".displayArea");
+  if (old) old.remove();
+  const canvas = el("div", { class: "displayArea disableAnimations" + (store.get("fake-actual-size") ? "" : " fitToPage") });
+  canvas.append(el("h1", {}, page.name));
+  const filter = query.get("filter");
+  const bar = el("div", { class: "bar" });
+  bar.style.width = filter ? "300px" : "1100px";
+  canvas.append(bar);
+  if (filter) canvas.append(el("p", { class: "filter" }, "Filter: " + filter));
+  if (store.get("fake-changed")) canvas.append(el("div", { class: "personal" }));
+  canvas.append(el("div", { class: "optionsMenu" }));  // a visual's hover toolbar
+  document.body.append(canvas);
+}
+
+function renderReport(m) {
+  const [, workspace, app, report, pageId] = m;
+  if (report.startsWith("00000000")) { location.replace("/home"); return; }
+  const page = PAGES.find(p => p.id === pageId) || PAGES[0];
+  // Workspace titles name the page first; App titles only the report.
+  document.title = app ? "Beispielbericht – Power BI" : `${page.name} - Beispielbericht – Power BI`;
+  const header = el("div", { class: "header" });
+  header.append(el("button", { class: "info-bar", "aria-label": "Beispielbericht" }, "Beispielbericht"));
+  document.body.append(header);
+
+  // Ribbon: its tabs are role=tab too, and "Start" is selected.
+  const ribbon = el("div", { class: "ribbon" });
+  const tabs = el("div", { role: "tablist", "aria-label": "Registerkarten des Menübands" });
+  tabs.append(el("div", { role: "tab", "aria-selected": "true" }, "Start"));
+  const view = el("div", { role: "tab", "aria-selected": "false" }, "Anzeigen");
+  view.onclick = () => {
+    const fit = el("button", {}, "An Seite anpassen");
+    fit.onclick = () => { store.set("fake-actual-size", false); renderCanvas(page); fit.remove(); };
+    ribbon.append(fit);
+  };
+  tabs.append(view);
+  ribbon.append(tabs);
+  const reset = el("button", {}, "Auf Standardwert zurücksetzen");
+  reset.disabled = !store.get("fake-changed");
+  reset.onclick = () => {
+    const dialog = el("div", { role: "dialog" });
+    dialog.append(el("p", {}, "Möchten Sie Filter, Slicer und weitere Änderungen zurücksetzen?"));
+    const ok = el("button", {}, "Zurücksetzen");
+    ok.onclick = () => { store.set("fake-changed", false); reset.disabled = true; dialog.remove(); renderCanvas(page); };
+    const cancel = el("button", {}, "Abbrechen");
+    cancel.onclick = () => dialog.remove();
+    dialog.append(ok, cancel);
+    document.body.append(dialog);
+  };
+  ribbon.append(reset);
+  document.body.append(ribbon);
+
+  // Navigation: the report's pages pane, or an App's own navigation.
+  const nav = el("div", { class: "nav" });
+  if (app) {
+    const list = el("mat-list");
+    list.append(el("div", { class: "itemRow", role: "button", "aria-label": "Beispielbericht" }, "Beispielbericht"));
+    for (const p of PAGES) {
+      const link = el("div", { class: "itemRow", role: "link", "aria-current": p.id === page.id ? "page" : "false" }, p.name);
+      list.append(link);
+    }
+    nav.append(list);
+  } else {
+    const pane = el("exploration-fluent-navigation");
+    const section = el("section", { class: "newLookPageNav", "aria-label": "Berichtsseiten" });
+    const list = el("mat-action-list", { role: "tablist", "aria-label": "Seiten" });
+    for (const p of PAGES) list.append(el("div", { role: "tab", "aria-selected": String(p.id === page.id) }, p.name));
+    section.append(list);
+    pane.append(section);
+    nav.append(pane);
+  }
+  document.body.append(nav);
+
+  renderCanvas(page);
+
+  // A tip appears a moment after loading, over the canvas.
+  setTimeout(() => {
+    const container = el("div", { class: "tutorial-popup-container" });
+    const popup = el("div", { class: "tutorial-popup trident no-icon" });
+    const box = el("div", { class: "box" }, "Dieses Visual zu PowerPoint hinzufügen");
+    const later = el("button", { class: "cancel btn" }, "Vielleicht später");
+    later.onclick = () => container.remove();
+    box.append(later);
+    popup.append(box);
+    container.append(popup);
+    document.body.append(container);
+  }, 300);
+}
+
+if (path === "/Redirect" && query.get("action") === "OpenApp") {
+  const ctid = query.get("ctid");
+  location.replace(`/groups/me/apps/${query.get("appId")}/reports/${REPORT}/${PAGES[0].id}` + (ctid ? `?ctid=${ctid}` : ""));
+} else {
+  const m = path.match(/^\/groups\/([^/]+)\/(?:apps\/([^/]+)\/)?reports\/([^/]+)\/([^/]+)/);
+  if (m) {
+    renderReport(m);
+  } else if (path.startsWith("/singleSignOn")) {
+    document.title = "Anmelden";
+    document.body.append(el("h1", {}, "Geben Sie Ihre E-Mail-Adresse ein"));
+  } else {
+    document.title = "Power BI";
+    document.body.append(el("h1", {}, "Start"));
+  }
+}
+</script>
+</body>
+</html>
