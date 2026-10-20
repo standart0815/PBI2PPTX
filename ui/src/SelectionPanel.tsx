@@ -243,7 +243,7 @@ export function SelectionPanel({
               onDuplicate={() => duplicate(index)}
               onRemove={() => remove(entry.id)}
               onApplyFilterToAll={applyToAll}
-              canCheck={ready && !locked}
+              canUseWindow={ready && !locked}
               drag={{
                 onDragStart: () => setDragged(index),
                 onDragOver: (e) => {

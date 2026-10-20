@@ -4,6 +4,8 @@ All notable changes to PBI2PPTX are listed here. Versions follow [Semantic Versi
 
 ## Unreleased
 
+- **Open** and **Open with Filters** on each Entry show its page in the Power BI Window for a quick check, without or with the Entry's Filters.
+
 ## 0.1.0
 
 The first public version.

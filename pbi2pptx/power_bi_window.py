@@ -235,6 +235,12 @@ class PowerBIWindow:
         name = await self._first_text(ui.CURRENT_PAGE_NAME) or page_url.page
         return CurrentPage(page_url, name, await self._report_name(name))
 
+    async def show_page(self, page_url: PageUrl, filters: Sequence[Filter | DateFilter] = ()) -> None:
+        """Open a page for the User to look at, with these Filters and nothing else: no reset to the
+        Default State, no "Fit to page"."""
+        await self.page.bring_to_front()
+        await self.page.goto(page_url.with_filters(filters) if filters else page_url.url)
+
     async def resolve(self, url: str) -> CurrentPage:
         """Open a pasted address (Page URL or shared App link) and return the page it lands on."""
         if not is_app_link(url):

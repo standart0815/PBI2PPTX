@@ -2,6 +2,7 @@ from starlette.testclient import TestClient
 
 import contextlib
 import time
+from datetime import date
 
 from PIL import Image
 
@@ -52,6 +53,11 @@ class FakeService:
         self.checked = list(filters)
         applied = filters[0].table == "financials"
         return FilterVerdict(FilterCheck.APPLIED if applied else FilterCheck.NOT_APPLIED, () if applied else tuple(filters))
+
+    async def show_page(self, page_url, filters):
+        if self.failure:
+            raise self.failure
+        self.shown = (page_url.url, list(filters))
 
     @contextlib.asynccontextmanager
     async def exclusive(self, language):
@@ -292,3 +298,25 @@ def test_filter_check_works_out_date_rules_and_refuses_empty_ranges(tmp_path):
     assert service.checked == [DateFilter("Calendar", "Date", date(today.year, 1, 1), today)]
     assert checked["result"] == "not applied" and "holds dates" in checked["message"]
     assert refused.status_code == 422 and "empty today" in refused.json()["error"]
+
+
+def test_entry_links_open_the_page_with_or_without_its_filters(tmp_path):
+    app, service, _ = make(tmp_path)
+    country = {"table": "financials", "column": "Country", "values": ["Germany"]}
+    year_to_date = {"table": "Calendar", "column": "Date", "from": {"rule": "startOfThisYear"}, "to": {"rule": "today"}}
+    with TestClient(app) as client:
+        plain = client.post("/api/page/open", headers=AUTH, json={"pageUrl": PAGE})
+        plain_shown = service.shown
+        filtered = client.post("/api/page/open", headers=AUTH, json={"pageUrl": PAGE, "filters": [country, year_to_date]})
+        filtered_shown = service.shown
+        broken = client.post("/api/page/open", headers=AUTH, json={"pageUrl": PAGE, "filters": [{"table": "x"}]})
+        service.failure = Busy("An Export is running. Wait until it has finished.")
+        busy = client.post("/api/page/open", headers=AUTH, json={"pageUrl": PAGE})
+    assert plain.status_code == 200 and plain_shown == (parse_page_url(PAGE).url, [])
+    assert filtered.status_code == 200
+    _, (shown_country, shown_dates) = filtered_shown
+    assert shown_country.values == ("Germany",)
+    assert shown_dates.end == date.today()  # Date Rules worked out for today
+    assert broken.status_code == 422
+    assert busy.status_code == 409 and "Export is running" in busy.json()["error"]
+

@@ -111,6 +111,19 @@ def test_rejects_addresses_that_are_neither_page_urls_nor_app_links(tmp_path):
         run(check())
 
 
+def test_entry_links_open_the_page_as_the_user_sees_it(tmp_path):
+    async def check():
+        async with fake_window(tmp_path) as w:
+            await w.show_page(parse_page_url(WS_PAGE + "?ctid=t-1"))
+            plain = w.page.url
+            await w.show_page(parse_page_url(WS_PAGE), [Filter("financials", "Country", ("Germany",))])
+            return plain, w.page.url
+
+    plain, filtered = run(check())
+    assert plain == WS_PAGE + "?ctid=t-1"
+    assert "filter=" in filtered and "financials/Country" in filtered.replace("%2F", "/")
+
+
 def test_capture_is_the_clean_canvas(tmp_path):
     out = tmp_path / "page.png"
 
