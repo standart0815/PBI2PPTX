@@ -74,6 +74,7 @@ export const api = {
   openSelection: (content: string) => call<{ selection: SelectionJson }>("/api/selection/open", "POST", { content }),
   getTemplate: () => call<{ template: TemplateInfo | null }>("/api/template"),
   uploadTemplate: (file: File) => call<{ template: TemplateInfo }>("/api/template", "POST", file),
+  openPage: (pageUrl: string, filters: Filter[] = []) => call("/api/page/open", "POST", { pageUrl, filters }),
   checkFilter: (pageUrl: string, filter: Filter) => call<FilterCheckResult>("/api/filters/check", "POST", { pageUrl, filter }),
   startExport: (selection: SelectionJson) => call("/api/export", "POST", { selection }),
   exportStatus: () => call<{ export: ExportProgress; deckReady: boolean }>("/api/export"),

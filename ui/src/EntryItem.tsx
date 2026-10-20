@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { api } from "./api";
+import { api, Refused } from "./api";
 import { FilterEditor } from "./FilterEditor";
 import { describeFilter, limitWarning } from "./filters";
 import { Entry, Filter, reachedThrough } from "./types";
@@ -14,7 +14,7 @@ export function EntryItem({
   onDuplicate,
   onRemove,
   onApplyFilterToAll,
-  canCheck,
+  canUseWindow,
   drag,
 }: {
   entry: Entry;
@@ -26,7 +26,8 @@ export function EntryItem({
   onDuplicate: () => void;
   onRemove: () => void;
   onApplyFilterToAll: (filter: Filter) => void;
-  canCheck: boolean;
+  canUseWindow: boolean; // signed in, and no Export running
+
   drag: {
     onDragStart: () => void;
     onDragOver: (e: React.DragEvent) => void;
@@ -36,7 +37,23 @@ export function EntryItem({
   };
 }) {
   const [showFilters, setShowFilters] = useState(false);
+  const [opened, setOpened] = useState<{ ok: boolean; text: string } | null>(null);
   const warning = limitWarning(entry);
+
+  async function open(withFilters: boolean) {
+    setOpened(null);
+    try {
+      await api.openPage(entry.pageUrl, withFilters ? entry.filters : []);
+      setOpened({
+        ok: true,
+        text: withFilters
+          ? "Opened in the Power BI Window with its Filters. Your own slicer selections may still show there; the slide shows the page reset to its default state."
+          : "Opened in the Power BI Window, without Filters.",
+      });
+    } catch (e) {
+      setOpened({ ok: false, text: e instanceof Refused ? e.message : `Something went wrong: ${String(e)}` });
+    }
+  }
 
   return (
     <li
@@ -65,6 +82,7 @@ export function EntryItem({
             {entry.reportName && ` · ${entry.reportName}`} · {reachedThrough(entry.pageUrl)}
           </p>
           {warning && <p className="warning small">{warning}</p>}
+          {opened && <p className={`small ${opened.ok ? "muted" : "error"}`}>{opened.text}</p>}
           {entry.filters.length > 0 && (
             <p className="small chips">
               {entry.filters.map((f, i) => (
@@ -76,6 +94,26 @@ export function EntryItem({
           )}
         </div>
         <div className="entry-actions">
+          <button
+            type="button"
+            className="quiet"
+            disabled={!canUseWindow}
+            title="Show this page in the Power BI Window, without Filters"
+            onClick={() => open(false)}
+          >
+            Open
+          </button>
+          {entry.filters.length > 0 && (
+            <button
+              type="button"
+              className="quiet"
+              disabled={!canUseWindow}
+              title="Show this page in the Power BI Window, with this Entry's Filters"
+              onClick={() => open(true)}
+            >
+              Open with Filters
+            </button>
+          )}
           <button type="button" className="quiet" aria-expanded={showFilters} onClick={() => setShowFilters(!showFilters)}>
             Filters{entry.filters.length ? ` (${entry.filters.length})` : ""}
           </button>
@@ -104,7 +142,7 @@ export function EntryItem({
           filters={entry.filters}
           onChange={(filters) => onChange({ ...entry, filters })}
           onApplyToAll={onApplyFilterToAll}
-          onCheck={canCheck ? (f) => api.checkFilter(entry.pageUrl, f) : null}
+          onCheck={canUseWindow ? (f) => api.checkFilter(entry.pageUrl, f) : null}
         />
       )}
     </li>
