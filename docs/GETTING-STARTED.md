@@ -1,6 +1,6 @@
 # Starting and using PBI2PPTX
 
-This manual covers version 0.1.0. It covers the whole path: install, sign in to Power BI, build a Selection of pages, choose the Template, Slide Layout and Render Language, and export the Deck.
+This manual covers version 0.2.0. It covers the whole path: install, sign in to Power BI, build a Selection of pages, choose the Template, Slide Layout and Render Language, and export the Deck.
 
 Terms such as *Power BI Window*, *Selection* and *Deck* are explained in [GLOSSARY.md](../GLOSSARY.md).
 
@@ -13,13 +13,13 @@ Terms such as *Power BI Window*, *Selection* and *Deck* are explained in [GLOSSA
 
 Download the installer for your system from the [Releases page](https://github.com/standart0815/PBI2PPTX/releases). The installers are **not code-signed** yet, so macOS and Windows warn before the first start. This is expected.
 
-**macOS:** open `PBI2PPTX-0.1.0-macOS.dmg` and drag **PBI2PPTX** into **Applications**. On the first start, macOS says it can't check the app:
+**macOS:** open `PBI2PPTX-0.2.0-macOS.dmg` and drag **PBI2PPTX** into **Applications**. On the first start, macOS says it can't check the app:
 1. Click **Done**.
 2. Open **System Settings → Privacy & Security**, scroll down to "PBI2PPTX was blocked…", and click **Open Anyway**.
 
 From then on it starts normally.
 
-**Windows:** run `PBI2PPTX-0.1.0-Windows-Setup.exe`. If SmartScreen says "Windows protected your PC", click **More info → Run anyway**. The installer needs no administrator rights. It installs for you only and adds PBI2PPTX to the Start menu, optionally to the desktop too. Uninstall it under *Settings → Apps*.
+**Windows:** run `PBI2PPTX-0.2.0-Windows-Setup.exe`. If SmartScreen says "Windows protected your PC", click **More info → Run anyway**. The installer needs no administrator rights. It installs for you only and adds PBI2PPTX to the Start menu, optionally to the desktop too. Uninstall it under *Settings → Apps*.
 
 ## Starting
 

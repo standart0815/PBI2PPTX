@@ -1,6 +1,6 @@
 [project]
 name = "pbi2pptx"
-version = "0.1.0"
+version = "0.2.0"
 description = "Turns a user's choice of Power BI report pages into one PowerPoint deck built from their own template."
 readme = "README.md"
 license = "MIT"

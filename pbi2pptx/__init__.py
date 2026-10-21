@@ -1,6 +1,6 @@
 """PBI2PPTX: turns a user's choice of Power BI report pages into one PowerPoint Deck."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 
 def static_dir():
